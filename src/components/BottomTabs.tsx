@@ -7,6 +7,7 @@ import {
   PieChart,
   HandCoins,
   HeartPulse,
+  Lightbulb,
   Settings,
 } from 'lucide-react';
 
@@ -15,6 +16,7 @@ const TABS = [
   { href: '/portfolio', icon: PieChart, label: '포트폴리오' },
   { href: '/loans', icon: HandCoins, label: '대출' },
   { href: '/retirement', icon: HeartPulse, label: '노후' },
+  { href: '/insights', icon: Lightbulb, label: '인사이트' },
   { href: '/settings', icon: Settings, label: '설정' },
 ] as const;
 

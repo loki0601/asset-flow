@@ -9,7 +9,7 @@ import { useCurrentUserId } from '@/components/AuthProvider';
 import { ManageHeader } from '@/components/ManageHeader';
 import { EmptyState } from '@/components/EmptyState';
 import { AddLoanModal, type AddLoanInput } from '@/features/loans/AddLoanModal';
-import { formatKRW } from '@/lib/loans';
+import { formatKRW, currentLoanBalance } from '@/lib/loans';
 
 export default function LoansManagePage() {
   const userId = useCurrentUserId();
@@ -86,7 +86,7 @@ export default function LoansManagePage() {
                 <p className="text-sm font-black text-brand-ink truncate">{loan.name}</p>
               </div>
               <p className="text-sm font-black text-brand-ink tabular-nums shrink-0">
-                {formatKRW(loan.remainingAmount)}
+                {formatKRW(Math.round(currentLoanBalance(loan)))}
               </p>
               <button
                 onClick={() => handleRemove(loan.id)}

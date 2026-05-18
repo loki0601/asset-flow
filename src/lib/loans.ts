@@ -96,3 +96,47 @@ export function remainingLoanBalance(
   // 원금균등상환
   return (principal * (totalMonths - monthsPaid)) / totalMonths;
 }
+
+import type { Loan } from '@/lib/schema';
+
+/**
+ * Live current-balance for a stored loan — derived from its contract terms
+ * + the months elapsed since startDate. Replaces the static
+ * `loan.remainingAmount` snapshot at display time so 원리금균등/원금균등
+ * loans naturally tick down month by month as time passes. Stays at the
+ * principal for 만기일시상환 until maturity.
+ *
+ * Returns 0 if the loan is past maturity or the contract terms are unset.
+ */
+export function currentLoanBalance(loan: Loan, now: Date = new Date()): number {
+  if (!loan.startDate || !loan.maturityDate) return loan.remainingAmount;
+  const start = new Date(loan.startDate + 'T00:00:00Z');
+  const maturity = new Date(loan.maturityDate + 'T00:00:00Z');
+  if (Number.isNaN(start.getTime()) || Number.isNaN(maturity.getTime())) {
+    return loan.remainingAmount;
+  }
+  // Total months derived from start → maturity (rounded).
+  const totalMonths = Math.max(
+    1,
+    Math.round(
+      (maturity.getUTCFullYear() - start.getUTCFullYear()) * 12 +
+        (maturity.getUTCMonth() - start.getUTCMonth()),
+    ),
+  );
+  // Months elapsed: whole months between start and `now`, clamped.
+  const monthsPaid = Math.max(
+    0,
+    Math.round(
+      (now.getUTCFullYear() - start.getUTCFullYear()) * 12 +
+        (now.getUTCMonth() - start.getUTCMonth()) -
+        (now.getUTCDate() < start.getUTCDate() ? 1 : 0),
+    ),
+  );
+  return remainingLoanBalance(
+    loan.method,
+    loan.totalAmount,
+    loan.rate,
+    totalMonths,
+    monthsPaid,
+  );
+}

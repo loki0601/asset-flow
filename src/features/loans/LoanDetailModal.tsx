@@ -2,7 +2,7 @@
 
 import { X } from 'lucide-react';
 import type { Loan } from '@/lib/schema';
-import { formatKRW, loanProgressRatio } from '@/lib/loans';
+import { formatKRW, loanProgressRatio, currentLoanBalance } from '@/lib/loans';
 import { Modal } from '@/components/Modal';
 
 interface Props {
@@ -12,8 +12,9 @@ interface Props {
 }
 
 export function LoanDetailModal({ open, onClose, loan }: Props) {
-  const progress = loanProgressRatio(loan.totalAmount, loan.remainingAmount);
-  const repaid = loan.totalAmount - loan.remainingAmount;
+  const remaining = Math.round(currentLoanBalance(loan));
+  const progress = loanProgressRatio(loan.totalAmount, remaining);
+  const repaid = loan.totalAmount - remaining;
 
   return (
     <Modal open={open} onClose={onClose}>
@@ -36,7 +37,7 @@ export function LoanDetailModal({ open, onClose, loan }: Props) {
       <div className="px-6 py-4">
         <p className="text-[10px] text-gray-400 font-bold uppercase mb-1">Remaining Balance</p>
         <p className="text-3xl font-black text-brand-ink tracking-tight">
-          {formatKRW(loan.remainingAmount)}
+          {formatKRW(remaining)}
         </p>
         <p className="text-xs font-medium text-gray-500 mt-1">
           총 {formatKRW(loan.totalAmount)} · 상환 {formatKRW(repaid)}

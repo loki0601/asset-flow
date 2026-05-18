@@ -66,6 +66,24 @@ function bootstrap(db: DB): void {
     );
     CREATE INDEX IF NOT EXISTS idx_user_backups_user_created
       ON user_backups (user_id, created_at DESC);
+    CREATE TABLE IF NOT EXISTS reference_events (
+      id          TEXT PRIMARY KEY,
+      kind        TEXT NOT NULL,
+      symbol      TEXT,
+      name        TEXT NOT NULL,
+      date        TEXT NOT NULL,
+      title       TEXT NOT NULL,
+      detail      TEXT,
+      impact      TEXT NOT NULL DEFAULT 'neutral',
+      confidence  TEXT NOT NULL DEFAULT 'estimated',
+      source      TEXT,
+      tags        TEXT,
+      added_at    TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_reference_events_date
+      ON reference_events (date);
+    CREATE INDEX IF NOT EXISTS idx_reference_events_kind_date
+      ON reference_events (kind, date);
   `);
 }
 

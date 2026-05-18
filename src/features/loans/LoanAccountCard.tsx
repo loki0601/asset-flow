@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { CreditCard } from 'lucide-react';
 import type { Loan } from '@/lib/schema';
-import { formatKRW } from '@/lib/loans';
+import { formatKRW, currentLoanBalance } from '@/lib/loans';
 import { LoanDetailModal } from './LoanDetailModal';
 import { card } from '@/lib/cardStyles';
 
@@ -34,7 +34,7 @@ export function LoanAccountCard({ loan }: { loan: Loan }) {
 
         <div className="flex justify-between items-center">
           <p className={card.smallLabel}>남은 금액</p>
-          <p className={card.value}>{formatKRW(loan.remainingAmount)}</p>
+          <p className={card.value}>{formatKRW(Math.round(currentLoanBalance(loan)))}</p>
         </div>
       </button>
 

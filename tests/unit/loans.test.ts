@@ -6,7 +6,9 @@ import {
   loanProgressRatio,
   monthlyLoanPayment,
   remainingLoanBalance,
+  currentLoanBalance,
 } from '@/lib/loans';
+import type { Loan } from '@/lib/schema';
 
 describe('formatKRW', () => {
   it('formats numbers with Korean locale thousands separators', () => {
@@ -126,6 +128,55 @@ describe('remainingLoanBalance', () => {
   it('handles 0% rate without divide-by-zero', () => {
     // 원리금균등 with r=0 → linear principal-only: P×(n-k)/n
     expect(remainingLoanBalance('원리금균등상환', 12_000_000, 0, 12, 4)).toBeCloseTo(8_000_000, 0);
+  });
+});
+
+describe('currentLoanBalance', () => {
+  const baseLoan = (overrides: Partial<Loan>): Loan => ({
+    id: 'l',
+    userId: 'u',
+    memberId: 'm',
+    name: '',
+    bank: '',
+    totalAmount: 100_000_000,
+    remainingAmount: 0, // ignored when contract terms present
+    method: '원리금균등상환',
+    rate: 5,
+    startDate: '2025-04-25',
+    maturityDate: '2055-04-25', // 30 years
+    paymentDay: 25,
+    monthlyEst: 0,
+    status: '상환 중',
+    createdAt: '',
+    ...overrides,
+  });
+
+  it('returns full principal on the start date', () => {
+    const v = currentLoanBalance(baseLoan({}), new Date('2025-04-25T12:00:00Z'));
+    expect(v).toBeCloseTo(100_000_000, 0);
+  });
+
+  it('원리금균등: shrinks year by year', () => {
+    const oneYearLater = currentLoanBalance(
+      baseLoan({}),
+      new Date('2026-04-25T12:00:00Z'),
+    );
+    // After 12 months: balance should drop by ~$1.4M-ish on a 100M / 30y / 5% loan
+    expect(oneYearLater).toBeLessThan(100_000_000);
+    expect(oneYearLater).toBeGreaterThan(98_000_000);
+  });
+
+  it('만기일시상환: stays at principal until maturity', () => {
+    const mid = currentLoanBalance(
+      baseLoan({ method: '만기일시상환', maturityDate: '2027-04-25' }),
+      new Date('2026-05-18T12:00:00Z'),
+    );
+    expect(mid).toBe(100_000_000);
+  });
+
+  it('returns 0 past maturity', () => {
+    const v = currentLoanBalance(baseLoan({}), new Date('2060-01-01T12:00:00Z'));
+    expect(v).toBe(0);
   });
 });
 

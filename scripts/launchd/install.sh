@@ -1,21 +1,41 @@
 #!/usr/bin/env bash
-# Install the launchd job that runs scripts/fetch-prices.py daily at 15:35 KST.
+# Install the launchd jobs that drive the daily server-side cron work.
 # Idempotent — unload existing version (if any) before reloading.
+#
+# Currently registers:
+#   - com.assetflow.fetch-prices              (15:35 KST, price snapshot)
+#   - com.assetflow.fetch-reference-events    (06:00 KST, IPO/lockup calendar)
 set -euo pipefail
 
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-SRC="$PROJECT_DIR/scripts/launchd/com.assetflow.fetch-prices.plist"
-DEST="$HOME/Library/LaunchAgents/com.assetflow.fetch-prices.plist"
+LAUNCH_DIR="$HOME/Library/LaunchAgents"
+mkdir -p "$LAUNCH_DIR"
 
-mkdir -p "$HOME/Library/LaunchAgents"
-sed "s|__PROJECT_DIR__|$PROJECT_DIR|g" "$SRC" > "$DEST"
+install_one() {
+  local label="$1"
+  local src="$PROJECT_DIR/scripts/launchd/${label}.plist"
+  local dest="$LAUNCH_DIR/${label}.plist"
 
-if launchctl list | grep -q "com.assetflow.fetch-prices"; then
-  launchctl unload "$DEST" 2>/dev/null || true
-fi
-launchctl load "$DEST"
+  if [ ! -f "$src" ]; then
+    echo "skip $label (no source plist)"
+    return
+  fi
 
-echo "installed: $DEST"
-echo "next run: 15:35 KST daily"
+  sed "s|__PROJECT_DIR__|$PROJECT_DIR|g" "$src" > "$dest"
+
+  if launchctl list | grep -q "$label"; then
+    launchctl unload "$dest" 2>/dev/null || true
+  fi
+  launchctl load "$dest"
+  echo "installed: $dest"
+}
+
+install_one com.assetflow.fetch-prices
+install_one com.assetflow.fetch-reference-events
+install_one com.assetflow.push-today-insights
+
+echo
 echo "verify : launchctl list | grep com.assetflow"
-echo "log    : tail -f $PROJECT_DIR/data/fetch-prices.log"
+echo "logs   : $PROJECT_DIR/data/fetch-prices.log"
+echo "         $PROJECT_DIR/data/fetch-reference-events.log"
+echo "         $PROJECT_DIR/data/push-today-insights.log"

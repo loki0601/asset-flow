@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  launchd job: run scripts/fetch-reference-events.py once per day at 06:00 KST.
+
+  Install (one-time):
+    bash scripts/launchd/install.sh
+
+  Inspect / control:
+    launchctl list | grep com.assetflow
+    launchctl print gui/$(id -u)/com.assetflow.fetch-reference-events
+    launchctl stop com.assetflow.fetch-reference-events
+    launchctl unload ~/Library/LaunchAgents/com.assetflow.fetch-reference-events.plist
+
+  Why 06:00?
+    NASDAQ IPO calendar usually updated overnight (US time). 06:00 KST ≈ 17:00
+    EDT prior day — late enough that any priced-yesterday IPOs are reflected
+    before the user's morning glance.
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.assetflow.fetch-reference-events</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>__PROJECT_DIR__/.venv/bin/python</string>
+    <string>__PROJECT_DIR__/scripts/fetch-reference-events.py</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>__PROJECT_DIR__</string>
+
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Hour</key>
+    <integer>6</integer>
+    <key>Minute</key>
+    <integer>0</integer>
+  </dict>
+
+  <key>StandardOutPath</key>
+  <string>__PROJECT_DIR__/data/fetch-reference-events.log</string>
+  <key>StandardErrorPath</key>
+  <string>__PROJECT_DIR__/data/fetch-reference-events.log</string>
+
+  <key>RunAtLoad</key>
+  <false/>
+</dict>
+</plist>

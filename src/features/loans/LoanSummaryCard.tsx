@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import type { Loan } from '@/lib/schema';
 import { loansRepo } from '@/lib/repos';
-import { formatKRW, totalOutstanding, repaymentProgress } from '@/lib/loans';
+import { formatKRW, totalOutstanding, repaymentProgress, currentLoanBalance } from '@/lib/loans';
 import { useCurrentUserId } from '@/components/AuthProvider';
 
 export function LoanSummaryCard() {
@@ -16,7 +16,7 @@ export function LoanSummaryCard() {
   }, [userId]);
 
   const totalBorrowed = loans.reduce((s, l) => s + l.totalAmount, 0);
-  const remaining = loans.reduce((s, l) => s + l.remainingAmount, 0);
+  const remaining = loans.reduce((s, l) => s + currentLoanBalance(l), 0);
   const totalRepaid = totalBorrowed - remaining;
   const monthlyPayment = loans.reduce((s, l) => s + l.monthlyEst, 0);
   const outstanding = totalOutstanding(totalBorrowed, totalRepaid);

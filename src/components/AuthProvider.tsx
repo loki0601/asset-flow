@@ -21,6 +21,7 @@ import { holdingsRepo } from '@/lib/repos';
 import { initPush } from '@/lib/push';
 import { ingestNativePendingSync } from '@/lib/nativeSync';
 import { initStatusBar } from '@/lib/statusBar';
+import { registerServiceWorker } from '@/lib/serviceWorker';
 
 interface AuthValue {
   userId: string | null;
@@ -144,6 +145,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
+    // Service worker registration — must run before initDb so the WASM
+    // request is served from SW cache on subsequent loads.
+    registerServiceWorker();
     let cancelled = false;
     (async () => {
       try {

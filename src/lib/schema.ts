@@ -37,6 +37,11 @@ export interface FamilyMember {
   id: string;
   userId: string;
   name: string;
+  /** YYYY (4-digit). Optional — used by the retirement page to compute
+   *  current age + 국민연금 수령 개시일. Members without a birth year skip
+   *  age-dependent annuity tax bands and default to the user-entered
+   *  currentAge instead. */
+  birthYear?: number;
   createdAt: string;
 }
 
@@ -168,7 +173,41 @@ export interface RetirementTarget {
   memberId: string;
   targetAge: number;
   currentAge: number;
+  /** Today's-purchasing-power monthly income goal (₩). When
+   *  `inflationAdjustEnabled` is true the retirement page bumps this by
+   *  `inflationRate` per year between now and the receipt age so the goal
+   *  line is comparable to the *future* nominal pension stream. */
   targetMonthly: number;
+
+  // Each pension type is independently opt-in. Setting `*Enabled` to true is
+  // the only way it shows up on the retirement page; default values for the
+  // other fields are previewed in the form but ignored if the toggle is off.
+
+  // ─── Public pension (국민연금) — manual ────────────────────────────────
+  publicEnabled?: boolean;
+  /** User-entered monthly amount from the NPS "예상연금 조회" page. */
+  publicMonthly?: number;
+  publicStartAge?: number; // default 65
+
+  // ─── Corporate pension (DC/DB only — IRP is treated as personal) ──────
+  corporateEnabled?: boolean;
+  corporateStartAge?: number; // default 55
+  corporateYears?: number; // default 10
+  corporateAnnualRate?: number; // default 0.04 (4%)
+
+  // ─── Personal pension (연금저축 + IRP) ─────────────────────────────────
+  personalEnabled?: boolean;
+  personalStartAge?: number; // default 55
+  personalYears?: number; // default 20
+  personalAnnualRate?: number; // default 0.04
+
+  // ─── Inflation adjustment toggle ──────────────────────────────────────
+  /** When true, the retirement page compares pension projections against
+   *  `targetMonthly × (1 + inflationRate)^yearsAhead` — i.e. the goal is
+   *  expressed in today's purchasing power and grown to future nominal
+   *  KRW at receipt date. */
+  inflationAdjustEnabled?: boolean; // default true
+  inflationRate?: number; // default 0.025 (2.5%/yr)
 }
 
 /**

@@ -2,28 +2,25 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { createId } from '@paralleldrive/cuid2';
-import { Plus, Trash2, HeartPulse, Target } from 'lucide-react';
-import type { FamilyMember, Pension, RetirementTarget } from '@/lib/schema';
-import { familyRepo, pensionsRepo, retirementTargetsRepo } from '@/lib/repos';
+import { Pencil, Trash2, Target } from 'lucide-react';
+import type { FamilyMember, RetirementTarget } from '@/lib/schema';
+import { familyRepo, retirementTargetsRepo } from '@/lib/repos';
 import { useCurrentUserId } from '@/components/AuthProvider';
 import { ManageHeader } from '@/components/ManageHeader';
 import { EmptyState } from '@/components/EmptyState';
 import { AddTargetModal, type AddTargetInput } from '@/features/retirement/AddTargetModal';
-import { AddPensionModal, type AddPensionInput } from '@/features/retirement/AddPensionModal';
 import { formatKRW } from '@/lib/loans';
 
 export default function RetirementManagePage() {
   const userId = useCurrentUserId();
   const [members, setMembers] = useState<FamilyMember[]>([]);
-  const [pensions, setPensions] = useState<Pension[]>([]);
   const [targets, setTargets] = useState<RetirementTarget[]>([]);
   const [targetOpen, setTargetOpen] = useState(false);
-  const [pensionOpen, setPensionOpen] = useState(false);
+  const [editingTarget, setEditingTarget] = useState<RetirementTarget | undefined>(undefined);
 
   useEffect(() => {
     if (!userId) return;
     setMembers(familyRepo.list(userId));
-    setPensions(pensionsRepo.list(userId));
     setTargets(retirementTargetsRepo.list(userId));
   }, [userId]);
 
@@ -34,7 +31,9 @@ export default function RetirementManagePage() {
 
   function handleAddTarget(input: AddTargetInput) {
     if (!userId) return;
-    // Replace existing target for the same member, or add new
+    // Replace existing target for the same member, or add new. AddTargetInput
+    // already carries every settable field; we just spread it onto a stored
+    // shape and let the existing repo handle the kv write.
     const existing = targets.find((t) => t.memberId === input.memberId);
     if (existing) {
       retirementTargetsRepo.update(userId, existing.id, input);
@@ -43,59 +42,18 @@ export default function RetirementManagePage() {
       retirementTargetsRepo.add(userId, target);
     }
     setTargets(retirementTargetsRepo.list(userId));
+    setEditingTarget(undefined);
+  }
+
+  function startEditTarget(t: RetirementTarget) {
+    setEditingTarget(t);
+    setTargetOpen(true);
   }
 
   function handleRemoveTarget(id: string) {
     if (!userId) return;
     retirementTargetsRepo.remove(userId, id);
     setTargets(retirementTargetsRepo.list(userId));
-  }
-
-  function handleAddPension(input: AddPensionInput) {
-    if (!userId) return;
-    const base = {
-      id: createId(),
-      userId,
-      memberId: input.memberId,
-      type: input.type,
-      title: input.title,
-      createdAt: new Date().toISOString(),
-    };
-    let pension: Pension;
-    if (input.category === 'public') {
-      pension = {
-        ...base,
-        category: 'public',
-        monthlyAmount: input.monthlyAmount,
-        payPeriod: input.payPeriod,
-        startYear: input.startYear,
-      };
-    } else if (input.category === 'corporate') {
-      pension = {
-        ...base,
-        category: 'corporate',
-        institution: input.institution,
-        totalValue: input.totalValue,
-        yield: input.yield,
-      };
-    } else {
-      pension = {
-        ...base,
-        category: 'personal',
-        institution: input.institution,
-        totalValue: input.totalValue,
-        annualContribution: input.annualContribution,
-        taxBenefit: input.taxBenefit,
-      };
-    }
-    pensionsRepo.add(userId, pension);
-    setPensions(pensionsRepo.list(userId));
-  }
-
-  function handleRemovePension(id: string) {
-    if (!userId) return;
-    pensionsRepo.remove(userId, id);
-    setPensions(pensionsRepo.list(userId));
   }
 
   return (
@@ -107,10 +65,13 @@ export default function RetirementManagePage() {
           <h3 className="text-lg font-black italic text-brand-ink">노후 목표</h3>
           <button
             type="button"
-            onClick={() => setTargetOpen(true)}
+            onClick={() => {
+              setEditingTarget(undefined);
+              setTargetOpen(true);
+            }}
             className="text-[11px] font-black text-brand inline-flex items-center gap-1"
           >
-            <Plus size={14} /> 목표 추가
+            <Target size={14} /> 목표 추가
           </button>
         </div>
 
@@ -139,6 +100,13 @@ export default function RetirementManagePage() {
                   </p>
                 </div>
                 <button
+                  onClick={() => startEditTarget(t)}
+                  className="w-9 h-9 rounded-full bg-brand-surface text-brand-sage flex items-center justify-center shrink-0"
+                  aria-label="편집"
+                >
+                  <Pencil size={16} />
+                </button>
+                <button
                   onClick={() => handleRemoveTarget(t.id)}
                   className="w-9 h-9 rounded-full bg-rose-50 text-rose-500 flex items-center justify-center shrink-0"
                   aria-label="삭제"
@@ -151,64 +119,22 @@ export default function RetirementManagePage() {
         )}
       </section>
 
-      <section>
-        <div className="flex justify-between items-end mb-3 px-2">
-          <h3 className="text-lg font-black italic text-brand-ink">연금 상품</h3>
-          <button
-            type="button"
-            onClick={() => setPensionOpen(true)}
-            className="text-[11px] font-black text-brand inline-flex items-center gap-1"
-          >
-            <Plus size={14} /> 연금 추가
-          </button>
-        </div>
-
-        {pensions.length === 0 ? (
-          <EmptyState
-            icon={HeartPulse}
-            title="등록된 연금이 없어요"
-            description="국민·퇴직·개인연금을 추가하세요."
-          />
-        ) : (
-          <div className="space-y-3">
-            {pensions.map((p) => (
-              <div
-                key={p.id}
-                className="bg-white rounded-[24px] border border-gray-100 p-5 flex items-center gap-3 shadow-sm"
-              >
-                <div className="w-10 h-10 bg-brand-surface rounded-2xl flex items-center justify-center text-brand shrink-0">
-                  <HeartPulse size={18} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-[10px] font-bold text-brand-sage uppercase tracking-tighter truncate">
-                    {p.type} · {membersById[p.memberId]?.name ?? '?'}
-                  </p>
-                  <p className="text-sm font-black text-brand-ink truncate">{p.title}</p>
-                </div>
-                <button
-                  onClick={() => handleRemovePension(p.id)}
-                  className="w-9 h-9 rounded-full bg-rose-50 text-rose-500 flex items-center justify-center shrink-0"
-                  aria-label="삭제"
-                >
-                  <Trash2 size={16} />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
+      {/*
+        "연금 상품" 수동 등록 섹션은 제거됨. 새 노후 설계에서는 보유 계좌
+        (DC/DB / 연금저축 / IRP)의 holdings에서 적립금이 자동 합산되고,
+        분할 시작 연도·기간·수익률·국민연금 월액은 모두 위의 "노후 목표"
+        한 곳에서 입력합니다.
+      */}
 
       <AddTargetModal
         open={targetOpen}
-        onClose={() => setTargetOpen(false)}
+        onClose={() => {
+          setTargetOpen(false);
+          setEditingTarget(undefined);
+        }}
         members={members}
+        existing={editingTarget}
         onSubmit={handleAddTarget}
-      />
-      <AddPensionModal
-        open={pensionOpen}
-        onClose={() => setPensionOpen(false)}
-        members={members}
-        onSubmit={handleAddPension}
       />
     </div>
   );
