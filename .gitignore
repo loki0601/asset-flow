@@ -62,3 +62,6 @@ playwright-report/
 .venv/
 __pycache__/
 *.pyc
+
+# Stray empty DB stub (real server.db lives at repo-root /data/)
+src/server/data/server.db
