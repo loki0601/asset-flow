@@ -1,0 +1,59 @@
+#!/usr/bin/env python3
+"""Push the patched DB blob from /tmp/db-patched.txt into the user's
+on-device localStorage via CDP, then reload."""
+from __future__ import annotations
+
+import json
+import os
+import sys
+import urllib.request
+
+from websocket import create_connection
+
+
+def main() -> int:
+    blob = open("/tmp/db-patched.txt").read().strip()
+    print(f"blob size: {len(blob)}", file=sys.stderr)
+
+    targets = json.loads(urllib.request.urlopen("http://127.0.0.1:" + os.environ.get("CDP_PORT", "9222") + "/json").read())
+    target = next((t for t in targets if "assetflow" in t.get("url", "")), targets[0])
+    print(f"target: {target['url']}", file=sys.stderr)
+
+    ws = create_connection(target["webSocketDebuggerUrl"], suppress_origin=True)
+    msg_id = 0
+
+    def send(method: str, params: dict | None = None) -> dict:
+        nonlocal msg_id
+        msg_id += 1
+        ws.send(json.dumps({"id": msg_id, "method": method, "params": params or {}}))
+        while True:
+            msg = json.loads(ws.recv())
+            if msg.get("id") == msg_id:
+                return msg
+
+    # Enable DOMStorage tracking
+    send("DOMStorage.enable")
+
+    storage_id = {"securityOrigin": "https://assetflow.elkavio.com", "isLocalStorage": True}
+
+    # Remove old item then set new one (setDOMStorageItem replaces)
+    resp = send(
+        "DOMStorage.setDOMStorageItem",
+        {"storageId": storage_id, "key": "assetflow:db", "value": blob},
+    )
+    if "error" in resp:
+        print(f"setDOMStorageItem error: {resp['error']}", file=sys.stderr)
+        return 1
+    print("blob written", file=sys.stderr)
+
+    # Reload so the app re-initializes sql.js from the new blob
+    send("Page.enable")
+    send("Page.reload", {"ignoreCache": False})
+    print("reloaded", file=sys.stderr)
+
+    ws.close()
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

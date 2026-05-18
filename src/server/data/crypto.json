@@ -1,0 +1,506 @@
+{
+  "as_of": "2026-05-16",
+  "count": 100,
+  "assets": [
+    {
+      "symbol": "CRYPTO:BTC",
+      "name": "Bitcoin",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:ETH",
+      "name": "Ethereum",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:USDT",
+      "name": "Tether",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:BNB",
+      "name": "BNB",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:XRP",
+      "name": "XRP",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:USDC",
+      "name": "USDC",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:SOL",
+      "name": "Solana",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:TRX",
+      "name": "TRON",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:FIGR_HELOC",
+      "name": "Figure Heloc",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:DOGE",
+      "name": "Dogecoin",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:WBT",
+      "name": "WhiteBIT Coin",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:USDS",
+      "name": "USDS",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:HYPE",
+      "name": "Hyperliquid",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:ADA",
+      "name": "Cardano",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:LEO",
+      "name": "LEO Token",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:BCH",
+      "name": "Bitcoin Cash",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:ZEC",
+      "name": "Zcash",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:LINK",
+      "name": "Chainlink",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:XMR",
+      "name": "Monero",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:CC",
+      "name": "Canton",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:TON",
+      "name": "Toncoin",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:XLM",
+      "name": "Stellar",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:USD1",
+      "name": "USD1",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:DAI",
+      "name": "Dai",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:LTC",
+      "name": "Litecoin",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:SUI",
+      "name": "Sui",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:USDE",
+      "name": "Ethena USDe",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:M",
+      "name": "MemeCore",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:AVAX",
+      "name": "Avalanche",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:HBAR",
+      "name": "Hedera",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:SHIB",
+      "name": "Shiba Inu",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:RAIN",
+      "name": "Rain",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:PYUSD",
+      "name": "PayPal USD",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:CRO",
+      "name": "Cronos",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:USDG",
+      "name": "Global Dollar",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:USYC",
+      "name": "Circle USYC",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:XAUT",
+      "name": "Tether Gold",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:BUIDL",
+      "name": "BlackRock USD Institutional Digital Liquidity Fund",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:TAO",
+      "name": "Bittensor",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:UNI",
+      "name": "Uniswap",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:MNT",
+      "name": "Mantle",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:DOT",
+      "name": "Polkadot",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:PAXG",
+      "name": "PAX Gold",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:WLFI",
+      "name": "World Liberty Financial",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:NEAR",
+      "name": "NEAR Protocol",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:USDY",
+      "name": "Ondo US Dollar Yield",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:USDF",
+      "name": "Falcon USD",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:HTX",
+      "name": "HTX DAO",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:OKB",
+      "name": "OKB",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:ASTER",
+      "name": "Aster",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:ONDO",
+      "name": "Ondo",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:PI",
+      "name": "Pi Network",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:SKY",
+      "name": "Sky",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:PEPE",
+      "name": "Pepe",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:RLUSD",
+      "name": "Ripple USD",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:USDD",
+      "name": "USDD",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:BGB",
+      "name": "Bitget Token",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:ICP",
+      "name": "Internet Computer",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:ETC",
+      "name": "Ethereum Classic",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:AAVE",
+      "name": "Aave",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:BFUSD",
+      "name": "BFUSD",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:QNT",
+      "name": "Quant",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:MORPHO",
+      "name": "Morpho",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:KCS",
+      "name": "KuCoin",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:USDTB",
+      "name": "USDtb",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:JTRSY",
+      "name": "Janus Henderson Anemoy Treasury Fund",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:U",
+      "name": "United Stables",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:EUTBL",
+      "name": "Spiko EU T-Bills Money Market Fund",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:USTB",
+      "name": "Superstate Short Duration U.S. Government Securities Fund (USTB)",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:ALGO",
+      "name": "Algorand",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:ATOM",
+      "name": "Cosmos Hub",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:ENA",
+      "name": "Ethena",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:BCAP",
+      "name": "Blockchain Capital",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:POL",
+      "name": "POL (ex-MATIC)",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:KAS",
+      "name": "Kaspa",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:RENDER",
+      "name": "Render",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:NEXO",
+      "name": "NEXO",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:WLD",
+      "name": "Worldcoin",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:FLR",
+      "name": "Flare",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:APT",
+      "name": "Aptos",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:JST",
+      "name": "JUST",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:GT",
+      "name": "Gate",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:FIL",
+      "name": "Filecoin",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:ARB",
+      "name": "Arbitrum",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:STABLE",
+      "name": "​​Stable",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:JUP",
+      "name": "Jupiter",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:XDC",
+      "name": "XDC Network",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:PUMP",
+      "name": "Pump.fun",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:VVV",
+      "name": "Venice Token",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:BDX",
+      "name": "Beldex",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:DEXE",
+      "name": "DeXe",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:VET",
+      "name": "VeChain",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:HASH",
+      "name": "Provenance Blockchain",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:GHO",
+      "name": "GHO",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:OUSG",
+      "name": "OUSG",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:USD0",
+      "name": "Usual USD",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:BONK",
+      "name": "Bonk",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:PENGU",
+      "name": "Pudgy Penguins",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:DASH",
+      "name": "Dash",
+      "market": "CoinGecko"
+    },
+    {
+      "symbol": "CRYPTO:YLDS",
+      "name": "YLDS",
+      "market": "CoinGecko"
+    }
+  ]
+}

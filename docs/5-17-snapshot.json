@@ -1,0 +1,946 @@
+{
+  "schemaVersion": 1,
+  "snapshotDate": "2026-05-17",
+  "userId": "loki0601",
+  "members": [
+    {
+      "id": "member-lee-youngrok",
+      "userId": "loki0601",
+      "name": "이영록",
+      "createdAt": "2026-05-17T00:00:00.000Z"
+    },
+    {
+      "id": "member-lee-yuchan",
+      "userId": "loki0601",
+      "name": "이유찬",
+      "createdAt": "2026-05-17T00:00:00.000Z"
+    },
+    {
+      "id": "member-ko-geumsook",
+      "userId": "loki0601",
+      "name": "고금숙",
+      "createdAt": "2026-05-17T00:00:00.000Z"
+    }
+  ],
+  "accounts": [
+    {
+      "id": "account-lee-kb-domestic",
+      "userId": "loki0601",
+      "memberId": "member-lee-youngrok",
+      "institution": "KB증권",
+      "name": "국내주식",
+      "createdAt": "2026-05-17T00:00:00.000Z"
+    },
+    {
+      "id": "account-lee-kb-us",
+      "userId": "loki0601",
+      "memberId": "member-lee-youngrok",
+      "institution": "KB증권",
+      "name": "해외주식",
+      "createdAt": "2026-05-17T00:00:00.000Z"
+    },
+    {
+      "id": "account-lee-kb-gold",
+      "userId": "loki0601",
+      "memberId": "member-lee-youngrok",
+      "institution": "KB증권",
+      "name": "금현물",
+      "createdAt": "2026-05-17T00:00:00.000Z"
+    },
+    {
+      "id": "account-lee-samsung-domestic",
+      "userId": "loki0601",
+      "memberId": "member-lee-youngrok",
+      "institution": "삼성증권",
+      "name": "국내주식",
+      "createdAt": "2026-05-17T00:00:00.000Z"
+    },
+    {
+      "id": "account-lee-samsung-us",
+      "userId": "loki0601",
+      "memberId": "member-lee-youngrok",
+      "institution": "삼성증권",
+      "name": "해외 주식",
+      "createdAt": "2026-05-17T00:00:00.000Z"
+    },
+    {
+      "id": "account-lee-samsung-irp",
+      "userId": "loki0601",
+      "memberId": "member-lee-youngrok",
+      "institution": "삼성증권 IRP",
+      "name": "IRP",
+      "createdAt": "2026-05-17T00:00:00.000Z"
+    },
+    {
+      "id": "account-lee-samsung-dc",
+      "userId": "loki0601",
+      "memberId": "member-lee-youngrok",
+      "institution": "삼성증권 IRP",
+      "name": "퇴직연금(DC)",
+      "createdAt": "2026-05-17T00:00:00.000Z"
+    },
+    {
+      "id": "account-lee-samsung-pension",
+      "userId": "loki0601",
+      "memberId": "member-lee-youngrok",
+      "institution": "삼성증권",
+      "name": "연금저축",
+      "createdAt": "2026-05-17T00:00:00.000Z"
+    },
+    {
+      "id": "account-yuchan-samsung-us",
+      "userId": "loki0601",
+      "memberId": "member-lee-yuchan",
+      "institution": "삼성증권",
+      "name": "해외주식",
+      "createdAt": "2026-05-17T00:00:00.000Z"
+    },
+    {
+      "id": "account-geumsook-hanwha-pension",
+      "userId": "loki0601",
+      "memberId": "member-ko-geumsook",
+      "institution": "한화투자증권",
+      "name": "연금저축",
+      "createdAt": "2026-05-17T00:00:00.000Z"
+    },
+    {
+      "id": "account-geumsook-hanwha-irp",
+      "userId": "loki0601",
+      "memberId": "member-ko-geumsook",
+      "institution": "한화투자증권",
+      "name": "IRP",
+      "createdAt": "2026-05-17T00:00:00.000Z"
+    },
+    {
+      "id": "account-geumsook-hanwha-us",
+      "userId": "loki0601",
+      "memberId": "member-ko-geumsook",
+      "institution": "한화투자증권",
+      "name": "해외주식",
+      "createdAt": "2026-05-17T00:00:00.000Z"
+    }
+  ],
+  "holdings": [
+    {
+      "id": "holding-lee-kb-domestic-samsung-electronics-20250131",
+      "userId": "loki0601",
+      "accountId": "account-lee-kb-domestic",
+      "symbol": "KRX:005930",
+      "quantity": 249,
+      "avgPrice": 145648,
+      "createdAt": "2025-01-31T00:00:00.000Z",
+      "updatedAt": "2025-01-31T00:00:00.000Z"
+    },
+    {
+      "id": "holding-lee-kb-us-arkx-20240101",
+      "userId": "loki0601",
+      "accountId": "account-lee-kb-us",
+      "symbol": "NASDAQ:ARKX",
+      "quantity": 14,
+      "avgPrice": 32.4971,
+      "createdAt": "2024-01-01T00:00:00.000Z",
+      "updatedAt": "2024-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "holding-lee-kb-us-googl-20240101",
+      "userId": "loki0601",
+      "accountId": "account-lee-kb-us",
+      "symbol": "NASDAQ:GOOGL",
+      "quantity": 41,
+      "avgPrice": 214.2966,
+      "createdAt": "2024-01-01T00:00:00.000Z",
+      "updatedAt": "2024-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "holding-lee-kb-us-aapl-20240101",
+      "userId": "loki0601",
+      "accountId": "account-lee-kb-us",
+      "symbol": "NASDAQ:AAPL",
+      "quantity": 37,
+      "avgPrice": 272.0743,
+      "createdAt": "2024-01-01T00:00:00.000Z",
+      "updatedAt": "2024-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "holding-lee-kb-us-avgo-20240101",
+      "userId": "loki0601",
+      "accountId": "account-lee-kb-us",
+      "symbol": "NASDAQ:AVGO",
+      "quantity": 33,
+      "avgPrice": 191.0364,
+      "createdAt": "2024-01-01T00:00:00.000Z",
+      "updatedAt": "2024-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "holding-lee-kb-us-meta-20240101",
+      "userId": "loki0601",
+      "accountId": "account-lee-kb-us",
+      "symbol": "NASDAQ:META",
+      "quantity": 12,
+      "avgPrice": 621.0658,
+      "createdAt": "2024-01-01T00:00:00.000Z",
+      "updatedAt": "2024-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "holding-lee-kb-us-msft-20240101",
+      "userId": "loki0601",
+      "accountId": "account-lee-kb-us",
+      "symbol": "NASDAQ:MSFT",
+      "quantity": 17,
+      "avgPrice": 428.4088,
+      "createdAt": "2024-01-01T00:00:00.000Z",
+      "updatedAt": "2024-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "holding-lee-kb-us-nvda-20240101",
+      "userId": "loki0601",
+      "accountId": "account-lee-kb-us",
+      "symbol": "NASDAQ:NVDA",
+      "quantity": 60,
+      "avgPrice": 139.7,
+      "createdAt": "2024-01-01T00:00:00.000Z",
+      "updatedAt": "2024-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "holding-lee-kb-us-tsla-20240101",
+      "userId": "loki0601",
+      "accountId": "account-lee-kb-us",
+      "symbol": "NASDAQ:TSLA",
+      "quantity": 32,
+      "avgPrice": 336.9672,
+      "createdAt": "2024-01-01T00:00:00.000Z",
+      "updatedAt": "2024-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "holding-lee-kb-gold-krx-gold-20250101",
+      "userId": "loki0601",
+      "accountId": "account-lee-kb-gold",
+      "symbol": "KRX:GOLD",
+      "quantity": 44,
+      "avgPrice": 223372,
+      "createdAt": "2025-01-01T00:00:00.000Z",
+      "updatedAt": "2025-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "holding-lee-samsung-domestic-nasdaq100-20240101",
+      "userId": "loki0601",
+      "accountId": "account-lee-samsung-domestic",
+      "symbol": "KRX:133690",
+      "quantity": 1,
+      "avgPrice": 81060,
+      "createdAt": "2024-01-01T00:00:00.000Z",
+      "updatedAt": "2024-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "holding-lee-samsung-us-avgo-20250101",
+      "userId": "loki0601",
+      "accountId": "account-lee-samsung-us",
+      "symbol": "NASDAQ:AVGO",
+      "quantity": 6,
+      "avgPrice": 348.07,
+      "createdAt": "2025-01-01T00:00:00.000Z",
+      "updatedAt": "2025-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "holding-lee-samsung-us-googl-20250101",
+      "userId": "loki0601",
+      "accountId": "account-lee-samsung-us",
+      "symbol": "NASDAQ:GOOGL",
+      "quantity": 14,
+      "avgPrice": 313.37,
+      "createdAt": "2025-01-01T00:00:00.000Z",
+      "updatedAt": "2025-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "holding-lee-samsung-us-msft-20250101",
+      "userId": "loki0601",
+      "accountId": "account-lee-samsung-us",
+      "symbol": "NASDAQ:MSFT",
+      "quantity": 5,
+      "avgPrice": 484.61,
+      "createdAt": "2025-01-01T00:00:00.000Z",
+      "updatedAt": "2025-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "holding-lee-samsung-us-nvda-20250101",
+      "userId": "loki0601",
+      "accountId": "account-lee-samsung-us",
+      "symbol": "NASDAQ:NVDA",
+      "quantity": 14,
+      "avgPrice": 188.7743,
+      "createdAt": "2025-01-01T00:00:00.000Z",
+      "updatedAt": "2025-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "holding-lee-samsung-us-pltr-20250101",
+      "userId": "loki0601",
+      "accountId": "account-lee-samsung-us",
+      "symbol": "NASDAQ:PLTR",
+      "quantity": 12,
+      "avgPrice": 175.14,
+      "createdAt": "2025-01-01T00:00:00.000Z",
+      "updatedAt": "2025-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "holding-lee-samsung-irp-bond-mix-20250513",
+      "userId": "loki0601",
+      "accountId": "account-lee-samsung-irp",
+      "symbol": "KRX:435420",
+      "quantity": 71,
+      "avgPrice": 14485,
+      "createdAt": "2025-05-13T00:00:00.000Z",
+      "updatedAt": "2025-05-13T00:00:00.000Z"
+    },
+    {
+      "id": "holding-lee-samsung-irp-nasdaq100-20250513",
+      "userId": "loki0601",
+      "accountId": "account-lee-samsung-irp",
+      "symbol": "KRX:133690",
+      "quantity": 13,
+      "avgPrice": 191015,
+      "createdAt": "2025-05-13T00:00:00.000Z",
+      "updatedAt": "2025-05-13T00:00:00.000Z"
+    },
+    {
+      "id": "holding-lee-samsung-irp-bond-mix-20250316",
+      "userId": "loki0601",
+      "accountId": "account-lee-samsung-irp",
+      "symbol": "KRX:435420",
+      "quantity": 77,
+      "avgPrice": 13520,
+      "createdAt": "2025-03-16T00:00:00.000Z",
+      "updatedAt": "2025-03-16T00:00:00.000Z"
+    },
+    {
+      "id": "holding-lee-samsung-irp-nasdaq100-20250313",
+      "userId": "loki0601",
+      "accountId": "account-lee-samsung-irp",
+      "symbol": "KRX:133690",
+      "quantity": 12,
+      "avgPrice": 163015,
+      "createdAt": "2025-03-13T00:00:00.000Z",
+      "updatedAt": "2025-03-13T00:00:00.000Z"
+    },
+    {
+      "id": "holding-lee-samsung-dc-bond-mix-20250209",
+      "userId": "loki0601",
+      "accountId": "account-lee-samsung-dc",
+      "symbol": "KRX:435420",
+      "quantity": 170,
+      "avgPrice": 13425,
+      "createdAt": "2025-02-09T00:00:00.000Z",
+      "updatedAt": "2025-02-09T00:00:00.000Z"
+    },
+    {
+      "id": "holding-lee-samsung-dc-nasdaq100-20250127",
+      "userId": "loki0601",
+      "accountId": "account-lee-samsung-dc",
+      "symbol": "KRX:133690",
+      "quantity": 11,
+      "avgPrice": 166275,
+      "createdAt": "2025-01-27T00:00:00.000Z",
+      "updatedAt": "2025-01-27T00:00:00.000Z"
+    },
+    {
+      "id": "holding-lee-samsung-dc-nasdaq100-20250123",
+      "userId": "loki0601",
+      "accountId": "account-lee-samsung-dc",
+      "symbol": "KRX:133690",
+      "quantity": 19,
+      "avgPrice": 163315,
+      "createdAt": "2025-01-23T00:00:00.000Z",
+      "updatedAt": "2025-01-23T00:00:00.000Z"
+    },
+    {
+      "id": "holding-lee-samsung-pension-nasdaq100-20230101",
+      "userId": "loki0601",
+      "accountId": "account-lee-samsung-pension",
+      "symbol": "KRX:133690",
+      "quantity": 511,
+      "avgPrice": 97676,
+      "createdAt": "2023-01-01T00:00:00.000Z",
+      "updatedAt": "2023-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "holding-lee-samsung-pension-india-nifty50-20230101",
+      "userId": "loki0601",
+      "accountId": "account-lee-samsung-pension",
+      "symbol": "KRX:453870",
+      "quantity": 300,
+      "avgPrice": 12220,
+      "createdAt": "2023-01-01T00:00:00.000Z",
+      "updatedAt": "2023-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "holding-yuchan-samsung-us-amzn-20250101",
+      "userId": "loki0601",
+      "accountId": "account-yuchan-samsung-us",
+      "symbol": "NASDAQ:AMZN",
+      "quantity": 9,
+      "avgPrice": 214.54,
+      "createdAt": "2025-01-01T00:00:00.000Z",
+      "updatedAt": "2025-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "holding-yuchan-samsung-us-googl-20250101",
+      "userId": "loki0601",
+      "accountId": "account-yuchan-samsung-us",
+      "symbol": "NASDAQ:GOOGL",
+      "quantity": 13,
+      "avgPrice": 327.3277,
+      "createdAt": "2025-01-01T00:00:00.000Z",
+      "updatedAt": "2025-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "holding-yuchan-samsung-us-meta-20250101",
+      "userId": "loki0601",
+      "accountId": "account-yuchan-samsung-us",
+      "symbol": "NASDAQ:META",
+      "quantity": 3,
+      "avgPrice": 656.62,
+      "createdAt": "2025-01-01T00:00:00.000Z",
+      "updatedAt": "2025-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "holding-yuchan-samsung-us-msft-20250101",
+      "userId": "loki0601",
+      "accountId": "account-yuchan-samsung-us",
+      "symbol": "NASDAQ:MSFT",
+      "quantity": 5,
+      "avgPrice": 420.42,
+      "createdAt": "2025-01-01T00:00:00.000Z",
+      "updatedAt": "2025-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "holding-yuchan-samsung-us-nvda-20250101",
+      "userId": "loki0601",
+      "accountId": "account-yuchan-samsung-us",
+      "symbol": "NASDAQ:NVDA",
+      "quantity": 12,
+      "avgPrice": 210.01,
+      "createdAt": "2025-01-01T00:00:00.000Z",
+      "updatedAt": "2025-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "holding-geumsook-hanwha-pension-nasdaq100-20250101",
+      "userId": "loki0601",
+      "accountId": "account-geumsook-hanwha-pension",
+      "symbol": "KRX:133690",
+      "quantity": 37,
+      "avgPrice": 161720,
+      "createdAt": "2025-01-01T00:00:00.000Z",
+      "updatedAt": "2025-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "holding-geumsook-hanwha-irp-bond-mix-20250101",
+      "userId": "loki0601",
+      "accountId": "account-geumsook-hanwha-irp",
+      "symbol": "KRX:435420",
+      "quantity": 166,
+      "avgPrice": 13540,
+      "createdAt": "2025-01-01T00:00:00.000Z",
+      "updatedAt": "2025-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "holding-geumsook-hanwha-irp-nasdaq100-20250101",
+      "userId": "loki0601",
+      "accountId": "account-geumsook-hanwha-irp",
+      "symbol": "KRX:133690",
+      "quantity": 30,
+      "avgPrice": 163070,
+      "createdAt": "2025-01-01T00:00:00.000Z",
+      "updatedAt": "2025-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "holding-geumsook-hanwha-us-avgo-20240101",
+      "userId": "loki0601",
+      "accountId": "account-geumsook-hanwha-us",
+      "symbol": "NASDAQ:AVGO",
+      "quantity": 33,
+      "avgPrice": 173.9939,
+      "createdAt": "2024-01-01T00:00:00.000Z",
+      "updatedAt": "2024-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "holding-geumsook-hanwha-us-nvda-20240101",
+      "userId": "loki0601",
+      "accountId": "account-geumsook-hanwha-us",
+      "symbol": "NASDAQ:NVDA",
+      "quantity": 71,
+      "avgPrice": 114.6881,
+      "createdAt": "2024-01-01T00:00:00.000Z",
+      "updatedAt": "2024-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "holding-geumsook-hanwha-us-tsla-20240101",
+      "userId": "loki0601",
+      "accountId": "account-geumsook-hanwha-us",
+      "symbol": "NASDAQ:TSLA",
+      "quantity": 56,
+      "avgPrice": 247.666,
+      "createdAt": "2024-01-01T00:00:00.000Z",
+      "updatedAt": "2024-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "holding-geumsook-hanwha-us-aapl-20240101",
+      "userId": "loki0601",
+      "accountId": "account-geumsook-hanwha-us",
+      "symbol": "NASDAQ:AAPL",
+      "quantity": 29,
+      "avgPrice": 204.4855,
+      "createdAt": "2024-01-01T00:00:00.000Z",
+      "updatedAt": "2024-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "holding-geumsook-hanwha-us-uber-20240101",
+      "userId": "loki0601",
+      "accountId": "account-geumsook-hanwha-us",
+      "symbol": "NASDAQ:UBER",
+      "quantity": 37,
+      "avgPrice": 69.4527,
+      "createdAt": "2024-01-01T00:00:00.000Z",
+      "updatedAt": "2024-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "holding-geumsook-hanwha-us-meta-20240101",
+      "userId": "loki0601",
+      "accountId": "account-geumsook-hanwha-us",
+      "symbol": "NASDAQ:META",
+      "quantity": 14,
+      "avgPrice": 598.16,
+      "createdAt": "2024-01-01T00:00:00.000Z",
+      "updatedAt": "2024-01-01T00:00:00.000Z"
+    }
+  ],
+  "transactions": [
+    {
+      "id": "tx-lee-kb-domestic-samsung-electronics-20250131",
+      "userId": "loki0601",
+      "accountId": "account-lee-kb-domestic",
+      "symbol": "KRX:005930",
+      "type": "buy",
+      "quantity": 249,
+      "price": 145648,
+      "amount": 36266352,
+      "occurredAt": "2025-01-31T00:00:00.000Z"
+    },
+    {
+      "id": "tx-lee-kb-us-arkx-20240101",
+      "userId": "loki0601",
+      "accountId": "account-lee-kb-us",
+      "symbol": "NASDAQ:ARKX",
+      "type": "buy",
+      "quantity": 14,
+      "price": 32.4971,
+      "amount": 454.9594,
+      "occurredAt": "2024-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "tx-lee-kb-us-googl-20240101",
+      "userId": "loki0601",
+      "accountId": "account-lee-kb-us",
+      "symbol": "NASDAQ:GOOGL",
+      "type": "buy",
+      "quantity": 41,
+      "price": 214.2966,
+      "amount": 8786.1606,
+      "occurredAt": "2024-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "tx-lee-kb-us-aapl-20240101",
+      "userId": "loki0601",
+      "accountId": "account-lee-kb-us",
+      "symbol": "NASDAQ:AAPL",
+      "type": "buy",
+      "quantity": 37,
+      "price": 272.0743,
+      "amount": 10066.7491,
+      "occurredAt": "2024-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "tx-lee-kb-us-avgo-20240101",
+      "userId": "loki0601",
+      "accountId": "account-lee-kb-us",
+      "symbol": "NASDAQ:AVGO",
+      "type": "buy",
+      "quantity": 33,
+      "price": 191.0364,
+      "amount": 6304.2012,
+      "occurredAt": "2024-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "tx-lee-kb-us-meta-20240101",
+      "userId": "loki0601",
+      "accountId": "account-lee-kb-us",
+      "symbol": "NASDAQ:META",
+      "type": "buy",
+      "quantity": 12,
+      "price": 621.0658,
+      "amount": 7452.7896,
+      "occurredAt": "2024-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "tx-lee-kb-us-msft-20240101",
+      "userId": "loki0601",
+      "accountId": "account-lee-kb-us",
+      "symbol": "NASDAQ:MSFT",
+      "type": "buy",
+      "quantity": 17,
+      "price": 428.4088,
+      "amount": 7282.9496,
+      "occurredAt": "2024-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "tx-lee-kb-us-nvda-20240101",
+      "userId": "loki0601",
+      "accountId": "account-lee-kb-us",
+      "symbol": "NASDAQ:NVDA",
+      "type": "buy",
+      "quantity": 60,
+      "price": 139.7,
+      "amount": 8382,
+      "occurredAt": "2024-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "tx-lee-kb-us-tsla-20240101",
+      "userId": "loki0601",
+      "accountId": "account-lee-kb-us",
+      "symbol": "NASDAQ:TSLA",
+      "type": "buy",
+      "quantity": 32,
+      "price": 336.9672,
+      "amount": 10782.9504,
+      "occurredAt": "2024-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "tx-lee-kb-gold-krx-gold-20250101",
+      "userId": "loki0601",
+      "accountId": "account-lee-kb-gold",
+      "symbol": "KRX:GOLD",
+      "type": "buy",
+      "quantity": 44,
+      "price": 223372,
+      "amount": 9828368,
+      "occurredAt": "2025-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "tx-lee-samsung-domestic-nasdaq100-20240101",
+      "userId": "loki0601",
+      "accountId": "account-lee-samsung-domestic",
+      "symbol": "KRX:133690",
+      "type": "buy",
+      "quantity": 1,
+      "price": 81060,
+      "amount": 81060,
+      "occurredAt": "2024-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "tx-lee-samsung-us-avgo-20250101",
+      "userId": "loki0601",
+      "accountId": "account-lee-samsung-us",
+      "symbol": "NASDAQ:AVGO",
+      "type": "buy",
+      "quantity": 6,
+      "price": 348.07,
+      "amount": 2088.42,
+      "occurredAt": "2025-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "tx-lee-samsung-us-googl-20250101",
+      "userId": "loki0601",
+      "accountId": "account-lee-samsung-us",
+      "symbol": "NASDAQ:GOOGL",
+      "type": "buy",
+      "quantity": 14,
+      "price": 313.37,
+      "amount": 4387.18,
+      "occurredAt": "2025-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "tx-lee-samsung-us-msft-20250101",
+      "userId": "loki0601",
+      "accountId": "account-lee-samsung-us",
+      "symbol": "NASDAQ:MSFT",
+      "type": "buy",
+      "quantity": 5,
+      "price": 484.61,
+      "amount": 2423.05,
+      "occurredAt": "2025-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "tx-lee-samsung-us-nvda-20250101",
+      "userId": "loki0601",
+      "accountId": "account-lee-samsung-us",
+      "symbol": "NASDAQ:NVDA",
+      "type": "buy",
+      "quantity": 14,
+      "price": 188.7743,
+      "amount": 2642.8402,
+      "occurredAt": "2025-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "tx-lee-samsung-us-pltr-20250101",
+      "userId": "loki0601",
+      "accountId": "account-lee-samsung-us",
+      "symbol": "NASDAQ:PLTR",
+      "type": "buy",
+      "quantity": 12,
+      "price": 175.14,
+      "amount": 2101.68,
+      "occurredAt": "2025-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "tx-lee-samsung-irp-bond-mix-20250513",
+      "userId": "loki0601",
+      "accountId": "account-lee-samsung-irp",
+      "symbol": "KRX:435420",
+      "type": "buy",
+      "quantity": 71,
+      "price": 14485,
+      "amount": 1028435,
+      "occurredAt": "2025-05-13T00:00:00.000Z"
+    },
+    {
+      "id": "tx-lee-samsung-irp-nasdaq100-20250513",
+      "userId": "loki0601",
+      "accountId": "account-lee-samsung-irp",
+      "symbol": "KRX:133690",
+      "type": "buy",
+      "quantity": 13,
+      "price": 191015,
+      "amount": 2483195,
+      "occurredAt": "2025-05-13T00:00:00.000Z"
+    },
+    {
+      "id": "tx-lee-samsung-irp-bond-mix-20250316",
+      "userId": "loki0601",
+      "accountId": "account-lee-samsung-irp",
+      "symbol": "KRX:435420",
+      "type": "buy",
+      "quantity": 77,
+      "price": 13520,
+      "amount": 1041040,
+      "occurredAt": "2025-03-16T00:00:00.000Z"
+    },
+    {
+      "id": "tx-lee-samsung-irp-nasdaq100-20250313",
+      "userId": "loki0601",
+      "accountId": "account-lee-samsung-irp",
+      "symbol": "KRX:133690",
+      "type": "buy",
+      "quantity": 12,
+      "price": 163015,
+      "amount": 1956180,
+      "occurredAt": "2025-03-13T00:00:00.000Z"
+    },
+    {
+      "id": "tx-lee-samsung-dc-bond-mix-20250209",
+      "userId": "loki0601",
+      "accountId": "account-lee-samsung-dc",
+      "symbol": "KRX:435420",
+      "type": "buy",
+      "quantity": 170,
+      "price": 13425,
+      "amount": 2282250,
+      "occurredAt": "2025-02-09T00:00:00.000Z"
+    },
+    {
+      "id": "tx-lee-samsung-dc-nasdaq100-20250127",
+      "userId": "loki0601",
+      "accountId": "account-lee-samsung-dc",
+      "symbol": "KRX:133690",
+      "type": "buy",
+      "quantity": 11,
+      "price": 166275,
+      "amount": 1829025,
+      "occurredAt": "2025-01-27T00:00:00.000Z"
+    },
+    {
+      "id": "tx-lee-samsung-dc-nasdaq100-20250123",
+      "userId": "loki0601",
+      "accountId": "account-lee-samsung-dc",
+      "symbol": "KRX:133690",
+      "type": "buy",
+      "quantity": 19,
+      "price": 163315,
+      "amount": 3102985,
+      "occurredAt": "2025-01-23T00:00:00.000Z"
+    },
+    {
+      "id": "tx-lee-samsung-pension-nasdaq100-20230101",
+      "userId": "loki0601",
+      "accountId": "account-lee-samsung-pension",
+      "symbol": "KRX:133690",
+      "type": "buy",
+      "quantity": 511,
+      "price": 97676,
+      "amount": 49902436,
+      "occurredAt": "2023-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "tx-lee-samsung-pension-india-nifty50-20230101",
+      "userId": "loki0601",
+      "accountId": "account-lee-samsung-pension",
+      "symbol": "KRX:453870",
+      "type": "buy",
+      "quantity": 300,
+      "price": 12220,
+      "amount": 3666000,
+      "occurredAt": "2023-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "tx-yuchan-samsung-us-amzn-20250101",
+      "userId": "loki0601",
+      "accountId": "account-yuchan-samsung-us",
+      "symbol": "NASDAQ:AMZN",
+      "type": "buy",
+      "quantity": 9,
+      "price": 214.54,
+      "amount": 1930.86,
+      "occurredAt": "2025-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "tx-yuchan-samsung-us-googl-20250101",
+      "userId": "loki0601",
+      "accountId": "account-yuchan-samsung-us",
+      "symbol": "NASDAQ:GOOGL",
+      "type": "buy",
+      "quantity": 13,
+      "price": 327.3277,
+      "amount": 4255.2601,
+      "occurredAt": "2025-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "tx-yuchan-samsung-us-meta-20250101",
+      "userId": "loki0601",
+      "accountId": "account-yuchan-samsung-us",
+      "symbol": "NASDAQ:META",
+      "type": "buy",
+      "quantity": 3,
+      "price": 656.62,
+      "amount": 1969.86,
+      "occurredAt": "2025-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "tx-yuchan-samsung-us-msft-20250101",
+      "userId": "loki0601",
+      "accountId": "account-yuchan-samsung-us",
+      "symbol": "NASDAQ:MSFT",
+      "type": "buy",
+      "quantity": 5,
+      "price": 420.42,
+      "amount": 2102.1,
+      "occurredAt": "2025-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "tx-yuchan-samsung-us-nvda-20250101",
+      "userId": "loki0601",
+      "accountId": "account-yuchan-samsung-us",
+      "symbol": "NASDAQ:NVDA",
+      "type": "buy",
+      "quantity": 12,
+      "price": 210.01,
+      "amount": 2520.12,
+      "occurredAt": "2025-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "tx-geumsook-hanwha-pension-nasdaq100-20250101",
+      "userId": "loki0601",
+      "accountId": "account-geumsook-hanwha-pension",
+      "symbol": "KRX:133690",
+      "type": "buy",
+      "quantity": 37,
+      "price": 161720,
+      "amount": 5983640,
+      "occurredAt": "2025-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "tx-geumsook-hanwha-irp-bond-mix-20250101",
+      "userId": "loki0601",
+      "accountId": "account-geumsook-hanwha-irp",
+      "symbol": "KRX:435420",
+      "type": "buy",
+      "quantity": 166,
+      "price": 13540,
+      "amount": 2247640,
+      "occurredAt": "2025-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "tx-geumsook-hanwha-irp-nasdaq100-20250101",
+      "userId": "loki0601",
+      "accountId": "account-geumsook-hanwha-irp",
+      "symbol": "KRX:133690",
+      "type": "buy",
+      "quantity": 30,
+      "price": 163070,
+      "amount": 4892100,
+      "occurredAt": "2025-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "tx-geumsook-hanwha-us-avgo-20240101",
+      "userId": "loki0601",
+      "accountId": "account-geumsook-hanwha-us",
+      "symbol": "NASDAQ:AVGO",
+      "type": "buy",
+      "quantity": 33,
+      "price": 173.9939,
+      "amount": 5741.7987,
+      "occurredAt": "2024-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "tx-geumsook-hanwha-us-nvda-20240101",
+      "userId": "loki0601",
+      "accountId": "account-geumsook-hanwha-us",
+      "symbol": "NASDAQ:NVDA",
+      "type": "buy",
+      "quantity": 71,
+      "price": 114.6881,
+      "amount": 8142.8551,
+      "occurredAt": "2024-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "tx-geumsook-hanwha-us-tsla-20240101",
+      "userId": "loki0601",
+      "accountId": "account-geumsook-hanwha-us",
+      "symbol": "NASDAQ:TSLA",
+      "type": "buy",
+      "quantity": 56,
+      "price": 247.666,
+      "amount": 13869.296,
+      "occurredAt": "2024-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "tx-geumsook-hanwha-us-aapl-20240101",
+      "userId": "loki0601",
+      "accountId": "account-geumsook-hanwha-us",
+      "symbol": "NASDAQ:AAPL",
+      "type": "buy",
+      "quantity": 29,
+      "price": 204.4855,
+      "amount": 5930.0795,
+      "occurredAt": "2024-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "tx-geumsook-hanwha-us-uber-20240101",
+      "userId": "loki0601",
+      "accountId": "account-geumsook-hanwha-us",
+      "symbol": "NASDAQ:UBER",
+      "type": "buy",
+      "quantity": 37,
+      "price": 69.4527,
+      "amount": 2569.7499,
+      "occurredAt": "2024-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "tx-geumsook-hanwha-us-meta-20240101",
+      "userId": "loki0601",
+      "accountId": "account-geumsook-hanwha-us",
+      "symbol": "NASDAQ:META",
+      "type": "buy",
+      "quantity": 14,
+      "price": 598.16,
+      "amount": 8374.24,
+      "occurredAt": "2024-01-01T00:00:00.000Z"
+    }
+  ]
+}

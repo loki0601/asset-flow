@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">AssetFlow</string>
+    <string name="title_activity_main">AssetFlow</string>
+    <string name="package_name">com.elkavio.assetflow</string>
+    <string name="custom_url_scheme">com.elkavio.assetflow</string>
+</resources>

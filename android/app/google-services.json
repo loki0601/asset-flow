@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "447959129715",
+    "project_id": "assetflow-elkavio",
+    "storage_bucket": "assetflow-elkavio.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:447959129715:android:12d9249f1796034b16d406",
+        "android_client_info": {
+          "package_name": "com.elkavio.assetflow"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCsro7gMOPXjZVjmuGyp626tq7Io3C6joI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
