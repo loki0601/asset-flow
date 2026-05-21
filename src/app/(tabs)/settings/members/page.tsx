@@ -40,14 +40,14 @@ export default function MembersPage() {
 
   return (
     <div className="pb-10">
-      <ManageHeader label="Members" title="가족 구성원" />
+      <ManageHeader label="Members" title="구성원" />
 
       {members.length === 0 ? (
         <div className="mb-4">
           <EmptyState
             icon={Users}
             title="등록된 구성원이 없어요"
-            description="아래 + 구성원 추가로 첫 가족 구성원을 등록하세요."
+            description="아래 + 구성원 추가로 첫 구성원을 등록하세요."
           />
         </div>
       ) : (

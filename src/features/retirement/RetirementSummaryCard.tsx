@@ -7,7 +7,7 @@ export function RetirementSummaryCard({ profile }: { profile: RetirementProfile 
   const attainment = computeAttainment(profile.expectedMonthly, profile.targetMonthly);
 
   return (
-    <div className="bg-brand rounded-[40px] p-8 mb-8 text-white shadow-2xl relative overflow-hidden">
+    <div className="bg-hero rounded-[40px] p-8 mb-8 text-white shadow-2xl relative overflow-hidden">
       <div className="absolute top-0 right-0 w-40 h-40 bg-white/5 rounded-full -mr-20 -mt-20 blur-3xl" />
 
       <div className="flex justify-between items-start mb-6 relative">

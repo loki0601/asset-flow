@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android 12+ override.  The platform Splash Screen API forces a brief
+  splash on every cold start; we can't disable it, but we can make it
+  invisible by:
+    1. setting the bg to the brand colour (matches the post-splash
+       windowBackground drawable, so the hand-off is seamless),
+    2. supplying a 1×1 transparent icon so no system icon appears.
+
+  The user lands straight on the brand-coloured landing drawable, then
+  the in-app SplashOverlay takes over once the WebView paints.
+-->
+<resources>
+    <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
+        <item name="android:windowSplashScreenBackground">@color/brand_splash_background</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/empty_icon</item>
+        <item name="android:windowSplashScreenIconBackgroundColor">@color/brand_splash_background</item>
+        <item name="postSplashScreenTheme">@style/AppTheme.NoActionBar</item>
+    </style>
+</resources>

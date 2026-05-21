@@ -1,12 +1,19 @@
 'use client';
 
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
-import { seedDefaultUser } from '@/lib/auth';
+import { usePathname, useRouter } from 'next/navigation';
+import { getCurrentUserId, logout as clearSession } from '@/lib/auth';
+import { familyRepo } from '@/lib/repos';
+import { syncThemeFromDb } from '@/hooks/useTheme';
+
+const PUBLIC_ROUTES = new Set(['/login', '/signup']);
+const ONBOARDING_ROUTE = '/onboarding';
 import {
   flushPersistDb,
   initDb,
   migrateAccountTypeRenames,
   migrateLegacyLocalStorage,
+  migrateLoki0601MemberName,
   SqliteKvStore,
 } from '@/lib/db';
 import { setStorage } from '@/lib/storage';
@@ -40,6 +47,10 @@ interface AuthValue {
   refreshPrices: () => Promise<void>;
   /** True while a manual price refresh is in-flight. */
   pricesSyncing: boolean;
+  /** Adopt a freshly authenticated user — called by /login + /signup. */
+  signIn: (userId: string) => void;
+  /** Clear the persisted session and reset in-memory userId. */
+  signOut: () => void;
 }
 
 const Ctx = createContext<AuthValue>({
@@ -52,13 +63,22 @@ const Ctx = createContext<AuthValue>({
   pricesLastSyncAt: null,
   refreshPrices: async () => {},
   pricesSyncing: false,
+  signIn: () => {},
+  signOut: () => {},
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
+  const pathname = usePathname();
   const [state, setState] = useState<
     Omit<
       AuthValue,
-      'refreshCatalog' | 'catalogSyncing' | 'refreshPrices' | 'pricesSyncing'
+      | 'refreshCatalog'
+      | 'catalogSyncing'
+      | 'refreshPrices'
+      | 'pricesSyncing'
+      | 'signIn'
+      | 'signOut'
     >
   >({
     userId: null,
@@ -154,11 +174,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await initDb();
         migrateLegacyLocalStorage();
         migrateAccountTypeRenames();
+        migrateLoki0601MemberName();
         setStorage(new SqliteKvStore());
-        const user = await seedDefaultUser();
+        // Theme preference may live in kv (persisted in the user DB
+        // blob).  Reconcile against localStorage now — after DB load —
+        // so a restored backup re-applies its dark/light setting.
+        syncThemeFromDb();
+        // No auto-seed — a missing session means the /login route gates
+        // entry. Existing devices keep their stored loki0601 session until
+        // explicit logout.
+        const userId = getCurrentUserId();
         if (!cancelled) {
           setState({
-            userId: user.id,
+            userId,
             ready: true,
             catalogVersion: getLocalCatalogVersion(),
             catalogLastSyncAt: getLastSyncAt(),
@@ -221,6 +249,46 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
+  const signIn = useCallback((userId: string) => {
+    setState((prev) => ({ ...prev, userId }));
+  }, []);
+
+  const signOut = useCallback(() => {
+    clearSession();
+    setState((prev) => ({ ...prev, userId: null }));
+    router.replace('/login');
+  }, [router]);
+
+  /**
+   * Auth gate: once boot finishes, route the user to the right page based
+   * on auth state.
+   *   - signed out + protected route → /login
+   *   - signed in + on /login or /signup → /
+   *   - signed in but no family member yet + outside /onboarding → /onboarding
+   *   - signed in + on /onboarding but members already exist → /
+   */
+  useEffect(() => {
+    if (!state.ready) return;
+    const onPublic = PUBLIC_ROUTES.has(pathname);
+    const onOnboarding = pathname === ONBOARDING_ROUTE;
+
+    if (!state.userId) {
+      if (!onPublic) router.replace('/login');
+      return;
+    }
+    if (onPublic) {
+      router.replace('/');
+      return;
+    }
+    // Signed in: force first-run onboarding only if there are no members.
+    // Don't auto-bounce off /onboarding once a member exists — the wizard
+    // has its own step-2 (account) flow and decides when to call replace('/').
+    const hasMembers = familyRepo.list(state.userId).length > 0;
+    if (!hasMembers && !onOnboarding) {
+      router.replace(ONBOARDING_ROUTE);
+    }
+  }, [state.ready, state.userId, pathname, router]);
+
   return (
     <Ctx.Provider
       value={{
@@ -229,11 +297,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         catalogSyncing: syncing,
         refreshPrices,
         pricesSyncing,
+        signIn,
+        signOut,
       }}
     >
       {children}
     </Ctx.Provider>
   );
+}
+
+export function useSignIn(): (userId: string) => void {
+  return useContext(Ctx).signIn;
+}
+
+export function useSignOut(): () => void {
+  return useContext(Ctx).signOut;
 }
 
 export function useCurrentUserId(): string | null {

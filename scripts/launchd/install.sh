@@ -30,12 +30,14 @@ install_one() {
   echo "installed: $dest"
 }
 
+install_one com.assetflow.web
 install_one com.assetflow.fetch-prices
 install_one com.assetflow.fetch-reference-events
 install_one com.assetflow.push-today-insights
 
 echo
 echo "verify : launchctl list | grep com.assetflow"
-echo "logs   : $PROJECT_DIR/data/fetch-prices.log"
+echo "logs   : $PROJECT_DIR/data/web-server.log"
+echo "         $PROJECT_DIR/data/fetch-prices.log"
 echo "         $PROJECT_DIR/data/fetch-reference-events.log"
 echo "         $PROJECT_DIR/data/push-today-insights.log"

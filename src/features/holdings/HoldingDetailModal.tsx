@@ -60,7 +60,12 @@ function DetailView({
   onClose: () => void;
   onTrade: (side: TradeSide) => void;
 }) {
-  const { holding, asset, totalValue, dailyChange, dailyChangePct } = view;
+  const { holding, asset, totalValue, dailyChangePct } = view;
+  // Daily-change pill mirrors the SYMBOL itself, not the user's
+  // position: show the asset's per-share change (전일 대비 가격 변동)
+  // not `qty × change`.  The qty-scaled daily P/L still lives in the
+  // detail rows below (평가 손익).
+  const dailyChange = asset.dailyChange;
   const isUp = dailyChange >= 0;
   // Detail view shows USD assets in their native currency (per product
   // spec — only the dashboard/portfolio cards convert to KRW so people
@@ -71,7 +76,7 @@ function DetailView({
   const effectiveNativePrice = asset.currentPrice || holding.avgPrice;
   const displayCurrentPrice = effectiveNativePrice;
   const displayAvgPrice = holding.avgPrice;
-  const displayDailyChange = holding.quantity * asset.dailyChange;
+  const displayDailyChange = asset.dailyChange;
   const displayTotalValue = effectiveNativePrice * holding.quantity;
   const profit = profitLossAmount(displayCurrentPrice, displayAvgPrice, holding.quantity);
   const profitPct = profitLossPercent(effectiveNativePrice, holding.avgPrice);

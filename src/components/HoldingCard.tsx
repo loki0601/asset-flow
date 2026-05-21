@@ -7,18 +7,14 @@ import { HoldingDetailModal } from '@/features/holdings/HoldingDetailModal';
 import { card } from '@/lib/cardStyles';
 import { formatKRW } from '@/lib/loans';
 import { assetDisplayName } from '@/lib/assetDisplay';
-
-const CATEGORY_COLORS: Record<string, string> = {
-  국내증권: '#2D4F35',
-  미국증권: '#4A7256',
-  가상자산: '#8BA18E',
-  금: '#B8C8BC',
-};
+import { categoryColor } from '@/lib/categoryColors';
+import { useTheme } from '@/hooks/useTheme';
 
 export function HoldingCard({ view, onAfterTrade }: { view: HoldingView; onAfterTrade?: () => void }) {
   const [open, setOpen] = useState(false);
+  const { theme } = useTheme();
   const up = view.gain >= 0;
-  const color = CATEGORY_COLORS[view.category] ?? '#2D4F35';
+  const color = categoryColor(view.category, theme);
   const qtyLabel = formatQty(view.holding.quantity, view.category);
   // USD assets carry a secondary native-currency pill alongside the KRW
   // primary values, so users can cross-check against US brokerage statements.

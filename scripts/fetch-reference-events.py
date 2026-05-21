@@ -399,26 +399,32 @@ def ensure_schema(conn: sqlite3.Connection) -> None:
 
 
 def upsert_nasdaq100_members(conn: sqlite3.Connection, members: set[str]) -> None:
-    """Refresh the NASDAQ-100 snapshot. `last_seen_date` records today for
-    every symbol present in this run so a future job can diff against
-    yesterday for index_addition / index_removal events."""
+    """Replace the NASDAQ-100 snapshot with the current member set.
+
+    Naive INSERT OR UPDATE leaves removed symbols in the table forever,
+    which made `diff_nasdaq100_events` re-fire the same removal day
+    after day — once CSGP exits the index, the diff still sees it in
+    `previous` (loaded from this table) AND missing from `current`,
+    so it triggers a removal event every run.
+
+    Replacing the entire set each run means `previous` accurately
+    reflects yesterday's actual NDX-100 composition, and diff events
+    fire exactly once at the membership transition.
+    """
     if not members:
         return
     today_iso = date.today().isoformat()
+    conn.execute("DELETE FROM nasdaq100_members")
     conn.executemany(
-        """
-        INSERT INTO nasdaq100_members (symbol, last_seen_date)
-        VALUES (?, ?)
-        ON CONFLICT(symbol) DO UPDATE SET last_seen_date = excluded.last_seen_date
-        """,
+        "INSERT INTO nasdaq100_members (symbol, last_seen_date) VALUES (?, ?)",
         [(s, today_iso) for s in members],
     )
     conn.commit()
 
 
 def load_nasdaq100_members(conn: sqlite3.Connection) -> set[str]:
-    """Fallback reader for when the live fetch fails — returns the
-    last-known snapshot regardless of staleness."""
+    """Return the last persisted NDX-100 membership (or empty if first run /
+    a previous fetch failed)."""
     rows = conn.execute("SELECT symbol FROM nasdaq100_members").fetchall()
     return {r[0] for r in rows}
 
@@ -1351,15 +1357,30 @@ def main() -> int:
         if macro_events:
             print(f"Macro: {len(macro_events)} events (high-impact whitelist)", file=sys.stderr)
 
-        # Press releases cover the same (symbol, effective_date) pair that
-        # the diff would emit ~10 days later when the API flips. Prefer the
-        # press-release version (richer detail, surfaces earlier) and drop
-        # the diff duplicate.
-        press_keys = {(e["kind"], e["symbol"], e["date"]) for e in press_events}
-        diff_events = [
-            e for e in diff_events
-            if (e["kind"], e["symbol"], e["date"]) not in press_keys
-        ]
+        # Press releases announce a membership change ~10 days before the
+        # API actually flips, so the press event and the diff event sit on
+        # different dates.  Match by (kind, symbol) within a ±21d window
+        # — long enough to cover the typical advance-notice period.  Press
+        # wins (richer detail, fires earlier).
+        DEDUP_WINDOW_DAYS = 21
+        def _drop_redundant_diffs(
+            diffs: list[dict], press: list[dict], window: int,
+        ) -> list[dict]:
+            by_key: dict[tuple[str, str], list[date]] = {}
+            for e in press:
+                key = (e["kind"], e["symbol"] or "")
+                by_key.setdefault(key, []).append(
+                    datetime.strptime(e["date"], "%Y-%m-%d").date()
+                )
+            out: list[dict] = []
+            for e in diffs:
+                key = (e["kind"], e["symbol"] or "")
+                d = datetime.strptime(e["date"], "%Y-%m-%d").date()
+                if any(abs((d - pd).days) <= window for pd in by_key.get(key, [])):
+                    continue
+                out.append(e)
+            return out
+        diff_events = _drop_redundant_diffs(diff_events, press_events, DEDUP_WINDOW_DAYS)
 
         all_events = (
             ipo_events + diff_events + press_events + earnings_events

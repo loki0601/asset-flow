@@ -1,17 +1,12 @@
 'use client';
 
 import { useMemo } from 'react';
-import { useHoldingsView } from '@/hooks/useHoldingsView';
+import type { HoldingView } from '@/hooks/useHoldingsView';
 import type { AssetCategory } from '@/lib/schema';
 import type { CategoryFilter } from '@/features/portfolio/CategoryTabs';
 import { assetDisplayName } from '@/lib/assetDisplay';
-
-const CATEGORY_COLORS: Record<AssetCategory, string> = {
-  국내증권: '#2D4F35',
-  미국증권: '#4A7256',
-  가상자산: '#8BA18E',
-  금: '#B8C8BC',
-};
+import { categoryColors } from '@/lib/categoryColors';
+import { useTheme } from '@/hooks/useTheme';
 
 // Symbol-level palette for the in-category donut. Cycled when more symbols
 // than palette entries exist — visual differentiation beats absolute
@@ -31,6 +26,9 @@ const SYMBOL_PALETTE = [
 
 interface Props {
   selected: CategoryFilter;
+  /** Provided by the parent page so a single useHoldingsView instance feeds
+   *  both the cards and the donut — keeps them in sync after a trade. */
+  views: HoldingView[];
 }
 
 interface Segment {
@@ -43,8 +41,13 @@ interface Segment {
 const R = 40;
 const C = 2 * Math.PI * R;
 
-export function AllocationDonut({ selected }: Props) {
-  const { views, totalValue: portfolioTotal } = useHoldingsView();
+export function AllocationDonut({ selected, views }: Props) {
+  const { theme } = useTheme();
+  const CATEGORY_COLORS = useMemo(() => categoryColors(theme), [theme]);
+  const portfolioTotal = useMemo(
+    () => views.reduce((sum, v) => sum + v.totalValue, 0),
+    [views],
+  );
 
   // Build segments: when "all" → group by category. When a specific category
   // → group by symbol within that category (each holding's totalValue summed

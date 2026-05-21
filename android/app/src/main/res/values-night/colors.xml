@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  System dark-mode overrides for the splash colours.  Hex matches the
+  in-app brand-surface dark token (#0C0D0F, vocalog deep-espresso) so
+  the system splash hands off to the in-app dark landing seamlessly.
+-->
+<resources>
+    <color name="brand_splash_background">#0C0D0F</color>
+</resources>

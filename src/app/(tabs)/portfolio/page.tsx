@@ -34,7 +34,7 @@ export default function PortfolioPage() {
         <p className="px-2 text-brand-sage text-[10px] font-bold uppercase tracking-[0.2em] -mb-2">
           Asset Allocation
         </p>
-        <AllocationDonut selected={selected} />
+        <AllocationDonut selected={selected} views={views} />
         <CategoryTabs selected={selected} onSelect={setSelected} available={availableCategories} />
         <div className="grid gap-4">
           {!loaded ? (

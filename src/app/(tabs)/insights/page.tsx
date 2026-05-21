@@ -31,14 +31,17 @@ interface ReferenceEvent {
   tags: string[];
 }
 
+// Tones intentionally desaturated to harmonize with the sage/earth palette.
+// Original saturated set (blue/amber/emerald/red/violet/pink/gray) felt too
+// loud against the muted brand tokens.
 const KIND_META: Record<string, { label: string; color: string; cta: string }> = {
-  ipo: { label: 'IPO 일정', color: '#3B82F6', cta: 'NASDAQ에서 보기' },
-  lockup_expiry: { label: '락업 해제', color: '#F59E0B', cta: '보유 종목 확인' },
-  index_addition: { label: '지수 편입', color: '#10B981', cta: '편입 종목 자세히' },
-  index_removal: { label: '지수 제외', color: '#DC2626', cta: '제외 종목 자세히' },
-  earnings: { label: '실적 발표', color: '#8B5CF6', cta: '실적 보기' },
-  momentum: { label: '모멘텀', color: '#EC4899', cta: '종목 시세 보기' },
-  macro: { label: '거시 이벤트', color: '#6B7280', cta: '자세히' },
+  ipo: { label: 'IPO 일정', color: '#5C7A9C', cta: 'NASDAQ에서 보기' },          // dusty slate-blue
+  lockup_expiry: { label: '락업 해제', color: '#B89968', cta: '보유 종목 확인' }, // muted ochre
+  index_addition: { label: '지수 편입', color: '#5C8B6B', cta: '편입 종목 자세히' }, // sage green
+  index_removal: { label: '지수 제외', color: '#B85950', cta: '제외 종목 자세히' }, // brand "up" (toned red — Korean direction convention)
+  earnings: { label: '실적 발표', color: '#8E7BA4', cta: '실적 보기' },         // dusty lavender
+  momentum: { label: '모멘텀', color: '#B07A8C', cta: '종목 시세 보기' },        // muted rose
+  macro: { label: '거시 이벤트', color: '#7A8C7E', cta: '자세히' },             // brand-sage
 };
 
 function metaFor(kind: string) {
@@ -233,7 +236,15 @@ function FilterChips({
   selected: Filter;
   onSelect: (f: Filter) => void;
 }) {
-  const filters: Filter[] = ['all', 'ipo', 'lockup_expiry', 'index', 'earnings', 'momentum'];
+  const filters: Filter[] = [
+    'all',
+    'ipo',
+    'lockup_expiry',
+    'index',
+    'earnings',
+    'momentum',
+    'macro',
+  ];
   return (
     <div className="flex gap-2 overflow-x-auto no-scrollbar py-1 mb-5">
       {filters.map((f) => {
@@ -401,11 +412,13 @@ function VerbBadge({
   verb: { label: string; tone: VerbTone };
   kindColor: string;
 }) {
+  // Match brand-up / brand-down tokens from tailwind.config.ts so up/down
+  // verbs sit in the same earthy palette as the kind colors.
   const bg =
     verb.tone === 'up'
-      ? '#10B981'
+      ? '#5C8B6B'  // sage green (matches brand 'up' direction subtly)
       : verb.tone === 'down'
-      ? '#DC2626'
+      ? '#B85950'  // toned red (brand.up token for Korean stock convention)
       : kindColor;
   return (
     <span

@@ -37,6 +37,42 @@ function withCommas(raw: string): string {
 }
 
 /** Add `years` (integer) to a YYYY-MM-DD date string. Returns YYYY-MM-DD. */
+// Curated lists for the dropdowns. The "기타" sentinel reveals a free-text
+// input so unusual cases still go through; the form submits whichever value
+// is currently visible.
+const LOAN_NAME_OPTIONS = [
+  '주택담보대출',
+  '전세자금대출',
+  '신용대출',
+  '마이너스통장',
+  '자동차대출',
+  '학자금대출',
+  '카드론',
+  '보금자리론',
+  '디딤돌대출',
+];
+
+const LOAN_BANK_OPTIONS = [
+  '국민은행',
+  '신한은행',
+  '우리은행',
+  '하나은행',
+  'IBK기업은행',
+  'NH농협은행',
+  'SC제일은행',
+  '카카오뱅크',
+  '토스뱅크',
+  '케이뱅크',
+  '새마을금고',
+  '신협',
+  '한국주택금융공사',
+  '삼성생명',
+  '한화생명',
+  '교보생명',
+];
+
+const OTHER_OPTION = '기타';
+
 function addYears(isoDate: string, years: number): string {
   if (!isoDate || !Number.isFinite(years)) return '';
   const [y, m, d] = isoDate.split('-').map(Number);
@@ -47,8 +83,13 @@ function addYears(isoDate: string, years: number): string {
 
 export function AddLoanModal({ open, onClose, members, onSubmit }: Props) {
   const [memberId, setMemberId] = useState('');
-  const [name, setName] = useState('');
-  const [bank, setBank] = useState('');
+  const [nameChoice, setNameChoice] = useState<string>(LOAN_NAME_OPTIONS[0]);
+  const [nameCustom, setNameCustom] = useState('');
+  const [bankChoice, setBankChoice] = useState<string>(LOAN_BANK_OPTIONS[0]);
+  const [bankCustom, setBankCustom] = useState('');
+  // Resolved values used for validation and submit.
+  const name = nameChoice === OTHER_OPTION ? nameCustom : nameChoice;
+  const bank = bankChoice === OTHER_OPTION ? bankCustom : bankChoice;
   const [totalStr, setTotalStr] = useState('');
   const [rateStr, setRateStr] = useState('');
   const [method, setMethod] = useState<LoanMethod>('원리금균등상환');
@@ -60,8 +101,10 @@ export function AddLoanModal({ open, onClose, members, onSubmit }: Props) {
   useEffect(() => {
     if (open) {
       setMemberId(members[0]?.id ?? '');
-      setName('');
-      setBank('');
+      setNameChoice(LOAN_NAME_OPTIONS[0]);
+      setNameCustom('');
+      setBankChoice(LOAN_BANK_OPTIONS[0]);
+      setBankCustom('');
       setTotalStr('');
       setRateStr('');
       setMethod('원리금균등상환');
@@ -159,7 +202,7 @@ export function AddLoanModal({ open, onClose, members, onSubmit }: Props) {
       <form onSubmit={handleSubmit} className="px-6 pb-6 space-y-3">
         <Field label="차주">
           {members.length === 0 ? (
-            <p className="text-xs font-bold text-rose-500 px-1">설정 → 가족 구성원에서 먼저 추가하세요.</p>
+            <p className="text-xs font-bold text-rose-500 px-1">설정 → 구성원에서 먼저 추가하세요.</p>
           ) : (
             <SelectField
               value={memberId}
@@ -170,11 +213,35 @@ export function AddLoanModal({ open, onClose, members, onSubmit }: Props) {
         </Field>
 
         <Field label="대출 이름">
-          <Text value={name} onChange={setName} placeholder="예: 주택담보대출" />
+          <SelectField
+            value={nameChoice}
+            onChange={setNameChoice}
+            options={[
+              ...LOAN_NAME_OPTIONS.map((n) => ({ value: n, label: n })),
+              { value: OTHER_OPTION, label: '기타 (직접 입력)' },
+            ]}
+          />
+          {nameChoice === OTHER_OPTION && (
+            <div className="mt-2">
+              <Text value={nameCustom} onChange={setNameCustom} placeholder="대출 이름 입력" />
+            </div>
+          )}
         </Field>
 
         <Field label="금융기관">
-          <Text value={bank} onChange={setBank} placeholder="예: 우리은행" />
+          <SelectField
+            value={bankChoice}
+            onChange={setBankChoice}
+            options={[
+              ...LOAN_BANK_OPTIONS.map((b) => ({ value: b, label: b })),
+              { value: OTHER_OPTION, label: '기타 (직접 입력)' },
+            ]}
+          />
+          {bankChoice === OTHER_OPTION && (
+            <div className="mt-2">
+              <Text value={bankCustom} onChange={setBankCustom} placeholder="금융기관 입력" />
+            </div>
+          )}
         </Field>
 
         <Field label="총 대출액">

@@ -1,11 +1,11 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { AssetCategory, Account, Holding, MarketAsset } from '@/lib/schema';
-import { accountsRepo, holdingsRepo } from '@/lib/repos';
+import { useEffect, useMemo } from 'react';
+import type { AssetCategory, Holding, MarketAsset } from '@/lib/schema';
 import { getMarketAsset, listMarketAssets } from '@/lib/market';
 import { getFxRate } from '@/lib/fx';
-import { useCurrentUserId, useMarketDataKey } from '@/components/AuthProvider';
+import { useMarketDataKey } from '@/components/AuthProvider';
+import { useHoldingsData } from '@/components/HoldingsDataProvider';
 
 export interface HoldingView {
   holding: Holding;
@@ -32,35 +32,11 @@ export function useHoldingsView(
   memberId: string | 'all' = 'all',
   accountId: string | 'all' = 'all',
 ) {
-  const userId = useCurrentUserId();
   const marketKey = useMarketDataKey();
-  // Initialize from the repos synchronously — sql.js is in-memory after
-  // AuthProvider boot, so there's no need to flash an empty list while a
-  // useEffect populates it on the next tick. `loaded` stays false until
-  // userId is known, so EmptyState callers can suppress the "보유 종목
-  // 없습니다" placeholder during the auth bootstrap.
-  const [holdings, setHoldings] = useState<Holding[]>(() =>
-    userId ? holdingsRepo.list(userId) : [],
-  );
-  const [accounts, setAccounts] = useState<Account[]>(() =>
-    userId ? accountsRepo.list(userId) : [],
-  );
-  const [loaded, setLoaded] = useState<boolean>(() => Boolean(userId));
-  const [, setRefreshKey] = useState(0);
-
-  useEffect(() => {
-    if (!userId) return;
-    setHoldings(holdingsRepo.list(userId));
-    setAccounts(accountsRepo.list(userId));
-    setLoaded(true);
-  }, [userId]);
-
-  const refresh = useCallback(() => {
-    if (!userId) return;
-    setHoldings(holdingsRepo.list(userId));
-    setAccounts(accountsRepo.list(userId));
-    setRefreshKey((k) => k + 1);
-  }, [userId]);
+  // Holdings + accounts come from the shared provider — one repo read per
+  // user session, shared across every hook instance.  Filtering and
+  // derivations below stay local to each consumer.
+  const { holdings, accounts, loaded, refresh } = useHoldingsData();
 
   // Filter by family member via the holding's account.memberId, then narrow
   // further by accountId when the user picks a specific account.

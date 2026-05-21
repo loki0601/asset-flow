@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Window background applied during activity startup.  Solid brand colour
+  underneath plus the landing PNG (icon + wordmark + microcopy already
+  baked in) centred and scaled to fill the screen width.  Tall screens get
+  brand-coloured strips above/below — looks intentional, not a void.
+-->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@color/brand_splash_background"/>
+    <item>
+        <bitmap
+            android:src="@drawable/landing"
+            android:gravity="fill_horizontal|center_vertical"/>
+    </item>
+</layer-list>

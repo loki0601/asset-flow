@@ -5,19 +5,21 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
+        // Each brand-* token is an `rgb(triplet / <alpha>)` reference to a
+        // CSS variable defined in globals.css.  Light is the default
+        // (:root); dark is `html[data-theme="dark"]`.  Same Tailwind class
+        // name, theme swaps under it.
         brand: {
-          DEFAULT: '#2D4F35',
-          mid: '#4A7256',
-          sage: '#7A8C7E',
-          ink: '#2D3A30',
-          surface: '#F4F7F5',
-          line: '#E9EDE9',
-          warm: '#FDFBF7',
+          DEFAULT: 'rgb(var(--brand) / <alpha-value>)',
+          mid: 'rgb(var(--brand-mid) / <alpha-value>)',
+          sage: 'rgb(var(--brand-sage) / <alpha-value>)',
+          ink: 'rgb(var(--brand-ink) / <alpha-value>)',
+          surface: 'rgb(var(--brand-surface) / <alpha-value>)',
+          line: 'rgb(var(--brand-line) / <alpha-value>)',
+          warm: 'rgb(var(--brand-warm) / <alpha-value>)',
           // Korean stock-app direction convention (red=up, blue=down).
-          // Toned down to harmonize with the earthy sage palette — no pure
-          // saturated reds/blues.
-          up: '#B85950',
-          down: '#4F6B82',
+          up: 'rgb(var(--brand-up) / <alpha-value>)',
+          down: 'rgb(var(--brand-down) / <alpha-value>)',
         },
       },
       fontFamily: {

@@ -1,6 +1,7 @@
 import './globals.css';
 import type { Metadata, Viewport } from 'next';
 import { AuthProvider } from '@/components/AuthProvider';
+import { HoldingsDataProvider } from '@/components/HoldingsDataProvider';
 
 export const metadata: Metadata = {
   title: 'Asset Flow',
@@ -23,6 +24,18 @@ export const viewport: Viewport = {
 // fresh server build) and hard-reloads with a cache-bust query so the
 // next attempt fetches the latest HTML + chunk references. Throttled to
 // once per 10s to avoid reload loops if the chunks really are gone.
+// Apply the user's saved theme before the page paints so the brand-* CSS
+// variables resolve correctly on first render.  Without this, a dark-mode
+// user briefly sees the light palette before useTheme() mounts.
+const THEME_BOOT = `
+(function(){
+  try {
+    var t = localStorage.getItem('assetflow:theme');
+    if (t === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+  } catch (e) {}
+})();
+`;
+
 const CHUNK_ERROR_GUARD = `
 (function() {
   function isChunkError(msg) {
@@ -52,10 +65,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="ko">
       <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_BOOT }} />
         <script dangerouslySetInnerHTML={{ __html: CHUNK_ERROR_GUARD }} />
       </head>
       <body className="min-h-screen font-sans antialiased">
-        <AuthProvider>{children}</AuthProvider>
+        <AuthProvider>
+          <HoldingsDataProvider>{children}</HoldingsDataProvider>
+        </AuthProvider>
       </body>
     </html>
   );

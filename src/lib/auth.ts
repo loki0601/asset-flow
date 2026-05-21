@@ -61,3 +61,30 @@ export async function login(username: string, password: string): Promise<User | 
 export function logout(): void {
   setCurrentUserId(null);
 }
+
+/**
+ * Create a new account and immediately log them in.
+ *
+ * Throws on invalid input or duplicate username — callers should surface
+ * the message directly to the form.
+ */
+export async function signup(username: string, password: string): Promise<User> {
+  const cleaned = username.trim();
+  if (!cleaned) throw new Error('username is required');
+  if (cleaned.length < 2) throw new Error('username must be at least 2 characters');
+  if (password.length < 4) {
+    throw new Error('password must be at least 4 characters');
+  }
+  if (findUserByUsername(cleaned)) {
+    throw new Error('이미 사용 중인 사용자명입니다');
+  }
+  const user: User = {
+    id: createId(),
+    username: cleaned,
+    passwordHash: await hashPassword(password),
+    createdAt: new Date().toISOString(),
+  };
+  writeJSON<User[]>(USERS_KEY, [...listUsers(), user]);
+  setCurrentUserId(user.id);
+  return user;
+}

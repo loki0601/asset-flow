@@ -253,6 +253,49 @@ export function _resetDbForTests(): void {
   db = null;
 }
 
+/**
+ * Nuke every local persistence layer: the in-memory sql.js handle, the
+ * IndexedDB blob store, the legacy localStorage blob fallback, plus
+ * sessionStorage. Caller should hard-reload the page afterwards so a fresh
+ * empty DB is created from scratch.
+ *
+ * Used by the settings "로컬 DB 초기화" button — pure destructive op, no
+ * confirmation here; the UI is expected to ask first.
+ */
+export async function clearLocalDb(): Promise<void> {
+  if (db) {
+    try {
+      db.close();
+    } catch {
+      /* ignore */
+    }
+    db = null;
+  }
+  if (typeof indexedDB !== 'undefined') {
+    await new Promise<void>((resolve) => {
+      const req = indexedDB.deleteDatabase(IDB_NAME);
+      req.onsuccess = () => resolve();
+      req.onerror = () => resolve();
+      req.onblocked = () => resolve();
+    });
+  }
+  if (typeof localStorage !== 'undefined') {
+    // Drop the legacy DB blob and any namespaced session/user keys —
+    // anything beginning with "assetflow:" was written by this app.
+    const toRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && (k === DB_BLOB_KEY || k.startsWith('assetflow:'))) {
+        toRemove.push(k);
+      }
+    }
+    for (const k of toRemove) localStorage.removeItem(k);
+  }
+  if (typeof sessionStorage !== 'undefined') {
+    sessionStorage.clear();
+  }
+}
+
 // ─── KV helpers ────────────────────────────────────────────────────────
 
 export function kvGet(key: string): string | null {
@@ -358,6 +401,60 @@ export function migrateAccountTypeRenames(): void {
     }
   }
   persistDb();
+}
+
+/**
+ * One-off fix: the dev account "loki0601" was created before the signup
+ * form captured a real name, so its first family member was seeded with a
+ * placeholder.  Set it to "이영록" the first time we see this device.
+ * Guarded by a kv flag so re-running the cron of migrations is cheap.
+ */
+export function migrateLoki0601MemberName(): void {
+  if (!db) return;
+  const FLAG = 'assetflow:migration:loki0601-member-name-v1';
+  const already = kvGet(FLAG);
+  if (already) return;
+
+  const usersRow = db.exec(`SELECT value FROM kv WHERE key = 'assetflow:users'`);
+  if (!usersRow.length) {
+    kvSet(FLAG, '1');
+    return;
+  }
+  let users: Array<{ id: string; username: string }> = [];
+  try {
+    const raw = usersRow[0].values[0]?.[0];
+    if (typeof raw === 'string') users = JSON.parse(raw);
+  } catch {
+    /* malformed users blob — abort migration silently */
+    kvSet(FLAG, '1');
+    return;
+  }
+  const loki = users.find((u) => u.username === 'loki0601');
+  if (!loki) {
+    kvSet(FLAG, '1');
+    return;
+  }
+  const memberKey = `assetflow:user:${loki.id}:members`;
+  const memberRow = db.exec('SELECT value FROM kv WHERE key = ?', [memberKey]);
+  if (memberRow.length) {
+    let members: Array<{ id: string; name: string; userId: string; createdAt: string }> = [];
+    try {
+      const raw = memberRow[0].values[0]?.[0];
+      if (typeof raw === 'string') members = JSON.parse(raw);
+    } catch {
+      kvSet(FLAG, '1');
+      return;
+    }
+    if (members.length > 0 && members[0].name !== '이영록') {
+      members[0] = { ...members[0], name: '이영록' };
+      db.run(
+        'INSERT INTO kv (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
+        [memberKey, JSON.stringify(members)],
+      );
+      persistDb();
+    }
+  }
+  kvSet(FLAG, '1');
 }
 
 // ─── Migration from legacy localStorage ────────────────────────────────

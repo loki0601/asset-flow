@@ -8,6 +8,7 @@ import {
   findUserByUsername,
   login,
   listUsers,
+  signup,
   DEFAULT_USERNAME,
   DEFAULT_PASSWORD,
 } from '@/lib/auth';
@@ -54,6 +55,34 @@ describe('seedDefaultUser', () => {
     await seedDefaultUser();
     await seedDefaultUser();
     expect(listUsers()).toHaveLength(1);
+  });
+});
+
+describe('signup', () => {
+  it('creates a new user, sets the session, and returns the user', async () => {
+    const u = await signup('alice', 'secret123');
+    expect(u.username).toBe('alice');
+    expect(listUsers()).toHaveLength(1);
+    expect(getCurrentUserId()).toBe(u.id);
+  });
+
+  it('rejects an empty username', async () => {
+    await expect(signup('', 'secret123')).rejects.toThrow(/username/i);
+  });
+
+  it('rejects a duplicate username', async () => {
+    await signup('alice', 'secret123');
+    await expect(signup('alice', 'other123')).rejects.toThrow(/이미/);
+  });
+
+  it('rejects a password shorter than 4 characters', async () => {
+    await expect(signup('alice', 'abc')).rejects.toThrow(/password|비밀번호/i);
+  });
+
+  it('hashes the stored password (no plaintext)', async () => {
+    const u = await signup('alice', 'secret123');
+    expect(u.passwordHash).not.toBe('secret123');
+    expect(u.passwordHash).toMatch(/^[0-9a-f]{64}$/);
   });
 });
 

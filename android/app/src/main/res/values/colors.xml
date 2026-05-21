@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="colorPrimary">#2D4F35</color>
+    <color name="colorPrimaryDark">#23402B</color>
+    <color name="colorAccent">#A6B89E</color>
+    <!-- Brand sage used for both the system splash background and the
+         post-splash window background.  Matches the in-app SplashOverlay so
+         the cold-start hand-off looks continuous (no black flash). -->
+    <color name="brand_splash_background">#2D4F35</color>
+</resources>

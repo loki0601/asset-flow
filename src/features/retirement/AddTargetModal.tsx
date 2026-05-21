@@ -169,7 +169,7 @@ export function AddTargetModal({ open, onClose, members, existing, onSubmit }: P
       >
         <Field label="구성원">
           {members.length === 0 ? (
-            <p className="text-xs font-bold text-rose-500 px-1">먼저 가족 구성원을 추가하세요.</p>
+            <p className="text-xs font-bold text-rose-500 px-1">먼저 구성원을 추가하세요.</p>
           ) : (
             <Select
               value={memberId}

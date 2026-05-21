@@ -10,6 +10,13 @@ const config: CapacitorConfig = {
   },
   android: {
     allowMixedContent: false,
+    // Transparent — lets the activity's windowBackground (the landing PNG)
+    // show through until React paints. Otherwise an opaque WebView covers
+    // the landing artwork and the user only sees a plain brand-colour
+    // frame between the system splash dismissing and SplashOverlay
+    // mounting.  WebView still renders content on top normally; it's only
+    // the empty-WebView phase that's now see-through.
+    backgroundColor: '#00000000',
   },
 };
 
