@@ -6,8 +6,11 @@ const config: NextConfig = {
   async headers() {
     return [
       {
-        // HTML pages, API routes — never cache so deploy changes show up immediately
-        source: '/((?!_next/static|_next/image|favicon).*)',
+        // HTML pages, API routes — never cache so deploy changes show up immediately.
+        // Exception: /api/icons/* serves expensive-to-build content (brand-icon
+        // manifest + cached company logos) that's safe to cache for 24h/30d via
+        // the route handler's own headers — let those win.
+        source: '/((?!_next/static|_next/image|favicon|api/icons/).*)',
         headers: [
           { key: 'Cache-Control', value: 'no-store, must-revalidate' },
         ],

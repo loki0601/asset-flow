@@ -9,7 +9,7 @@
 import { NextResponse } from 'next/server';
 import { spawn } from 'node:child_process';
 import path from 'node:path';
-import { trackedSymbolsRepo } from '@/server/db';
+import { shouldBackfill, trackedSymbolsRepo } from '@/server/db';
 
 export const dynamic = 'force-dynamic';
 
@@ -34,9 +34,7 @@ export async function POST(request: Request) {
   const existing = trackedSymbolsRepo.get(symbol);
   trackedSymbolsRepo.upsert(symbol);
 
-  // Spawn the backfill worker only on first registration or if the previous
-  // attempt failed. Already-ready symbols don't re-fetch.
-  if (!existing || existing.status === 'failed') {
+  if (shouldBackfill(existing)) {
     try {
       spawnBackfill(symbol);
     } catch (err) {

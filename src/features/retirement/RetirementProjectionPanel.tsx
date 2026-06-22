@@ -8,9 +8,7 @@ import type {
   MarketAsset,
   PensionCategory,
   RetirementTarget,
-  Transaction,
 } from '@/lib/schema';
-import { RetirementProgressChart } from '@/features/retirement/RetirementProgressChart';
 import {
   buildProjection,
   pensionPrincipalForMember,
@@ -22,21 +20,20 @@ interface Props {
   target: RetirementTarget;
   accounts: Account[];
   holdings: Holding[];
-  transactions: Transaction[];
   marketAsset: (symbol: string) => MarketAsset | undefined;
   fxUsdKrw: number;
 }
 
 /**
- * Pension projection for a single member: 3 cards (국민 / 퇴직 / 개인) +
- * lifetime stacked-area chart showing monthly net income from each stream
- * with the inflation-adjusted goal line overlaid.
+ * Pension projection for a single member: 3 cards (국민 / 퇴직 / 개인).
+ * The historical-progress chart that used to live here was replaced by
+ * the page-level RetirementFlowChart (daily-total curve) per the 2026-05-30
+ * design pass.
  */
 export function RetirementProjectionPanel({
   target,
   accounts,
   holdings,
-  transactions,
   marketAsset,
   fxUsdKrw,
 }: Props) {
@@ -104,15 +101,6 @@ export function RetirementProjectionPanel({
         )}
       </div>
 
-      <RetirementProgressChart
-        target={target}
-        accounts={accounts}
-        holdings={holdings}
-        transactions={transactions}
-        marketAsset={marketAsset}
-        fxUsdKrw={fxUsdKrw}
-        proj={proj}
-      />
     </div>
   );
 }

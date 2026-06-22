@@ -7,17 +7,16 @@ import type {
   FamilyMember,
   Holding,
   RetirementTarget,
-  Transaction,
 } from '@/lib/schema';
 import {
   accountsRepo,
   familyRepo,
   holdingsRepo,
   retirementTargetsRepo,
-  transactionsRepo,
 } from '@/lib/repos';
 import { PersonSwitcher } from '@/features/retirement/PersonSwitcher';
 import { RetirementSummaryCard } from '@/features/retirement/RetirementSummaryCard';
+import { RetirementFlowChart } from '@/features/retirement/RetirementFlowChart';
 import { RetirementProjectionPanel } from '@/features/retirement/RetirementProjectionPanel';
 import { EmptyState } from '@/components/EmptyState';
 import { useCurrentUserId, useMarketDataKey } from '@/components/AuthProvider';
@@ -79,7 +78,6 @@ export default function RetirementPage() {
   const [targets, setTargets] = useState<RetirementTarget[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [holdings, setHoldings] = useState<Holding[]>([]);
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [selected, setSelected] = useState<string | 'all'>('all');
 
   useEffect(() => {
@@ -88,7 +86,6 @@ export default function RetirementPage() {
     setTargets(retirementTargetsRepo.list(userId));
     setAccounts(accountsRepo.list(userId));
     setHoldings(holdingsRepo.list(userId));
-    setTransactions(transactionsRepo.list(userId));
     // marketKey changes when prices/catalog sync — re-pulling triggers a
     // recompute with fresh currentPrice values.
   }, [userId, marketKey]);
@@ -134,10 +131,11 @@ export default function RetirementPage() {
 
   return (
     <div className="pb-10">
-      <p className="px-2 text-brand-sage text-[10px] font-bold uppercase tracking-[0.2em] mb-2">
-        Retirement Plan
-      </p>
       <RetirementSummaryCard profile={summary} />
+
+      <div className="mt-6">
+        <RetirementFlowChart selected={selected} />
+      </div>
 
       <PersonSwitcher members={planningMembers} selected={selected} onSelect={setSelected} />
 
@@ -166,7 +164,6 @@ export default function RetirementPage() {
                     target={target}
                     accounts={accounts}
                     holdings={holdings}
-                    transactions={transactions}
                     marketAsset={getMarketAsset}
                     fxUsdKrw={fxUsdKrw}
                   />

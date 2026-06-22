@@ -156,30 +156,13 @@ export default function InsightsPage() {
 
   return (
     <div className="pb-10" ref={containerRef}>
-      {/* Sticky header zone: title + switch + tagline + filter chips.
-       *  Extends upward (via negative margin equal to main's safe-area pt)
-       *  so its background covers the status-bar/notch area when stuck —
-       *  prevents the timeline rows from being seen behind the status bar
-       *  when scrolled.  Inner paddingTop restores the visual position. */}
-      <div
-        className="sticky top-0 z-20 bg-brand-surface -mx-6 px-6 pb-3 border-b border-brand-line/60"
-        style={{
-          marginTop: 'calc(-1 * (env(safe-area-inset-top) + 1rem))',
-          paddingTop: 'calc(env(safe-area-inset-top) + 1rem)',
-        }}
-      >
-        <div className="flex items-end justify-between gap-3 px-2 mb-1">
-          <div className="flex-1 min-w-0">
-            <p className="text-brand-sage text-[10px] font-bold uppercase tracking-[0.2em] mb-1">
-              Insights
-            </p>
-            <h2 className="text-2xl font-black text-brand-ink">자산 인사이트</h2>
-          </div>
-          <PastSwitch showPast={showPast} onToggle={handlePastToggle} />
-        </div>
-        <p className="px-2 text-[10px] text-brand-sage font-bold mb-4 uppercase tracking-widest">
+      <div className="flex items-center justify-between gap-3 px-2 mb-3">
+        <p className="text-[11px] text-brand-sage font-bold uppercase tracking-widest">
           Daily Reference Events
         </p>
+        <PastSwitch showPast={showPast} onToggle={handlePastToggle} />
+      </div>
+      <div className="mb-5">
         <FilterChips selected={filter} onSelect={setFilter} />
       </div>
 

@@ -8,8 +8,9 @@
  *   - 0 local rows           → GET /api/prices/history (full backfill)
  *   - local_max = latest BD  → skip
  *   - 1 BD gap               → append today's close from the bulk payload
- *   - 2+ BD gap              → skip (per design: per-symbol catch-up via
- *                              individual calls is intentionally avoided)
+ *   - 2+ BD gap              → backfill missing rows via /api/prices/history
+ *                              starting at the first missing business day
+ *                              (covers users who skipped a day or more)
  */
 
 import { kvGet, kvSet } from '@/lib/db';
@@ -21,6 +22,36 @@ import type { MarketAsset } from '@/lib/schema';
 const ASSETS_KEY = 'assetflow:catalog:assets';
 const LAST_SYNC_KEY = 'assetflow:prices:lastSyncAt';
 const FULL_BACKFILL_FROM = '2016-01-01';
+// Per-symbol kv flag set after a deep fetch from FULL_BACKFILL_FROM has
+// succeeded once. Without it the gap-fast-path forever asks
+// `from=localMax+1`, which leaves users who entered tracking late (only a
+// few cron-appended rows in local storage) permanently missing the
+// historical backfill that the server has since populated.
+const fullBackfillFlagKey = (symbol: string) =>
+  `assetflow:priceHistory:fullBackfilled:${symbol}`;
+
+function isFullBackfilled(symbol: string): boolean {
+  return kvGet(fullBackfillFlagKey(symbol)) === '1';
+}
+
+/** Mark a symbol as having completed its deep history backfill. Exported so
+ *  tests covering the gap-path behavior can pre-seed it without going through
+ *  a real /api/prices/history fetch. */
+export function markFullBackfilled(symbol: string): void {
+  kvSet(fullBackfillFlagKey(symbol), '1');
+}
+
+/** True iff at least one held symbol still needs a deep-history pull.
+ *  AuthProvider's boot block uses this to bypass the 15-minute price-sync
+ *  cooldown the very first time after a deep-backfill schema change —
+ *  otherwise a user who just restarted the app would have to wait out the
+ *  cooldown (or tap refresh) before getting the historical rows. */
+export function needsDeepBackfill(symbols: readonly string[]): boolean {
+  for (const s of symbols) {
+    if (!isFullBackfilled(s)) return true;
+  }
+  return false;
+}
 
 export interface PriceEntry {
   price: number;
@@ -83,9 +114,11 @@ async function syncHistoryFor(
   const latest = businessDays.length > 0 ? businessDays[businessDays.length - 1] : null;
   const localMax = priceHistoryRepo.getMaxDate(symbol);
 
-  if (localMax === null) {
-    // First sync — pull full range from server (server may still be backfilling,
-    // in which case status≠ready and we just leave it for next time).
+  if (localMax === null || !isFullBackfilled(symbol)) {
+    // First sync, or a previous client only filled the recent days (e.g.
+    // daily-cron appends without backfill). Pull the full range from the
+    // server. Server may still be backfilling, in which case status≠ready
+    // and we just leave it for next time without marking the flag.
     const res = await fetchImpl(
       `/api/prices/history?symbol=${encodeURIComponent(symbol)}&from=${FULL_BACKFILL_FROM}`,
     );
@@ -93,6 +126,7 @@ async function syncHistoryFor(
     const data = (await res.json()) as HistoryResp;
     if (data.status === 'ready' && data.rows.length > 0) {
       priceHistoryRepo.append(symbol, data.rows);
+      markFullBackfilled(symbol);
     }
     return;
   }
@@ -107,7 +141,21 @@ async function syncHistoryFor(
     }
     return;
   }
-  // gap >= 2 — skip per requirement.
+
+  // gap >= 2 — backfill the missing window from the server. Use the next
+  // business day after localMax as `from` so the call returns only the
+  // missing rows (priceHistoryRepo dedupes via UPSERT either way, but a
+  // tight window keeps the response small).
+  const iLocal = businessDays.indexOf(localMax);
+  const fromDate = iLocal >= 0 && iLocal + 1 < businessDays.length ? businessDays[iLocal + 1] : localMax;
+  const res = await fetchImpl(
+    `/api/prices/history?symbol=${encodeURIComponent(symbol)}&from=${fromDate}`,
+  );
+  if (!res.ok) return;
+  const data = (await res.json()) as HistoryResp;
+  if (data.status === 'ready' && data.rows.length > 0) {
+    priceHistoryRepo.append(symbol, data.rows);
+  }
 }
 
 /**

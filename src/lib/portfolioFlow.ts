@@ -64,6 +64,13 @@ export function computePortfolioFlow(
     /** USDKRW history. When provided, USD-denominated symbols are converted
      *  to KRW using the rate active on each plotted date. */
     fxUsdKrw?: FxLookup;
+    /** What each plotted point measures. 'assets' (default) = market value
+     *  Σ qty×close. 'profit' = valuation P&L Σ qty×(close − unitCost), so the
+     *  curve tracks unrealised gain/loss and can go negative. */
+    metric?: 'assets' | 'profit';
+    /** Per-symbol unit cost (native currency, same scale as close) used when
+     *  metric==='profit'. Symbols missing from the map are treated as cost 0. */
+    unitCostBySymbol?: Map<string, number>;
   },
 ): PriceHistoryRow[] {
   if (txs.length === 0) return [];
@@ -130,7 +137,11 @@ export function computePortfolioFlow(
       const meta = options?.symbolMeta?.get(symbol);
       const isUsd = meta?.currency === 'USD';
       const fx = isUsd ? fxCursor.lastRate : 1;
-      total += q * close * fx;
+      const unit =
+        options?.metric === 'profit'
+          ? close - (options.unitCostBySymbol?.get(symbol) ?? 0)
+          : close;
+      total += q * unit * fx;
     }
     out.push({ date: d, close: total });
   }

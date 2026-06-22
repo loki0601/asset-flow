@@ -47,6 +47,12 @@ export async function initPush(): Promise<void> {
 
   PushNotifications.addListener('pushNotificationActionPerformed', (a) => {
     console.info('[push] tapped', a);
+    const action = (a.notification?.data as Record<string, unknown> | undefined)?.action;
+    if (action === 'insights') {
+      // Route the tap to the Insights tab. Hard navigation is fine — the
+      // WebView is (re)entering the app from a background/cold tap.
+      window.location.assign('/insights');
+    }
   });
 
   await PushNotifications.register();

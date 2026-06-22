@@ -3,15 +3,17 @@
 import { useEffect, useState } from 'react';
 import { accountsRepo, holdingsRepo, transactionsRepo } from '@/lib/repos';
 import { priceHistoryRepo, type PriceHistoryRow } from '@/lib/priceHistoryRepo';
-import { fxHistoryRepo, type FxHistoryRow } from '@/lib/fxHistoryRepo';
+import { fxHistoryRepo } from '@/lib/fxHistoryRepo';
 import {
   computePortfolioFlow,
   type FxLookup,
   type PortfolioTx,
   type SymbolMeta,
 } from '@/lib/portfolioFlow';
+import { applyCumulativeProfit, type CashflowEvent } from '@/lib/cumulativeProfit';
 import { getMarketAsset } from '@/lib/market';
-import { getFxRate } from '@/lib/fx';
+import { getFxRate, syncFxHistory } from '@/lib/fx';
+import { liveHoldingsValue } from '@/lib/holdingsValue';
 import { useCurrentUserId, useMarketDataKey } from '@/components/AuthProvider';
 import type { Holding, Transaction } from '@/lib/schema';
 
@@ -67,13 +69,64 @@ function buildTxs(
   return [...realTxs, ...syntheticTxs];
 }
 
+/**
+ * KRW cashflows for the 누적수익 (cumulative P&L) series — one signed event per
+ * buy/sell (and per synthetic buy for holdings without a tx trail). USD amounts
+ * are converted at the CURRENT FX (not the transaction-date FX), so the curve
+ * EXCLUDES currency gains/losses and reflects only stock performance — matching
+ * the dashboard header's 평가손익 basis (per product decision).
+ */
+function buildCashflows(
+  allTxs: Transaction[],
+  allHoldings: Holding[],
+  histories: Map<string, PriceHistoryRow[]>,
+  fxNow: number,
+): CashflowEvent[] {
+  const events: CashflowEvent[] = [];
+  const seen = new Set<string>();
+  for (const t of allTxs) {
+    if (!t.symbol || !t.quantity) continue;
+    if (t.type !== 'buy' && t.type !== 'sell') continue;
+    const date = t.occurredAt.slice(0, 10);
+    const usd = getMarketAsset(t.symbol)?.currency === 'USD';
+    const native = t.amount || (t.price ?? 0) * t.quantity;
+    const krw = native * (usd ? fxNow : 1);
+    events.push({ date, krw: t.type === 'buy' ? krw : -krw });
+    seen.add(`${t.accountId}:${t.symbol}`);
+  }
+  for (const h of allHoldings) {
+    if (seen.has(`${h.accountId}:${h.symbol}`)) continue;
+    const date =
+      histories.get(h.symbol)?.[0]?.date ??
+      (h.createdAt ? h.createdAt.slice(0, 10) : new Date().toISOString().slice(0, 10));
+    const usd = getMarketAsset(h.symbol)?.currency === 'USD';
+    events.push({ date, krw: h.quantity * h.avgPrice * (usd ? fxNow : 1) });
+  }
+  return events;
+}
+
+/** Replace the most-recent point's value in place (keeping its date), used to
+ *  pin today's point to the live header valuation. No-op on an empty series. */
+function anchorLastClose(rows: PriceHistoryRow[], value: number): void {
+  if (rows.length === 0) return;
+  rows[rows.length - 1] = { ...rows[rows.length - 1], close: Math.round(value) };
+}
+
+export interface PortfolioFlowSeries {
+  /** Σ qty×close — market-value curve. */
+  assets: PriceHistoryRow[];
+  /** marketValue − netInvested — cumulative total P&L (realised + unrealised);
+   *  retains realised gains so rotating positions doesn't drop the curve. */
+  cumulative: PriceHistoryRow[];
+}
+
 export function usePortfolioFlow(
   memberId: string | 'all' = 'all',
   accountId: string | 'all' = 'all',
-): PriceHistoryRow[] {
+): PortfolioFlowSeries {
   const userId = useCurrentUserId();
   const marketKey = useMarketDataKey();
-  const [rows, setRows] = useState<PriceHistoryRow[]>([]);
+  const [series, setSeries] = useState<PortfolioFlowSeries>({ assets: [], cumulative: [] });
 
   useEffect(() => {
     if (!userId) return;
@@ -93,7 +146,7 @@ export function usePortfolioFlow(
     const allTxs = transactionsRepo.list(userId).filter((t) => passes(t.accountId));
     const allHoldings = holdingsRepo.list(userId).filter((h) => passes(h.accountId));
     if (allHoldings.length === 0 && allTxs.length === 0) {
-      setRows([]);
+      setSeries({ assets: [], cumulative: [] });
       return;
     }
 
@@ -131,15 +184,33 @@ export function usePortfolioFlow(
     function recompute(histories: Map<string, PriceHistoryRow[]>): void {
       const txs = buildTxs(allTxs, allHoldings, histories);
       if (txs.length === 0) {
-        setRows([]);
+        setSeries({ assets: [], cumulative: [] });
         return;
       }
-      setRows(
-        computePortfolioFlow(txs, histories, {
-          symbolMeta: buildSymbolMeta(),
-          fxUsdKrw: loadFxLookup(),
-        }),
-      );
+      const symbolMeta = buildSymbolMeta();
+      const fxUsdKrw = loadFxLookup();
+      const fxNow = getFxRate('USDKRW');
+      const live = liveHoldingsValue(allHoldings, getMarketAsset, fxNow);
+
+      // 총자산: market value at the FX that was actually in effect on each
+      // historical date (real historical KRW value). Endpoint anchored to the
+      // live header total.
+      const assets = computePortfolioFlow(txs, histories, { symbolMeta, fxUsdKrw });
+      anchorLastClose(assets, live.assets);
+
+      // 누적수익 = marketValue − netInvested, FX-excluded: value USD at the
+      // CURRENT rate on every date (empty rates → the fx cursor stays on
+      // fallback=fxNow) and cost at the current rate too, so currency moves
+      // don't shift the curve — only stock P&L does. Endpoint = live.assets −
+      // total net invested ⇒ matches the header 평가손익 when there are no sells.
+      const mvNow = computePortfolioFlow(txs, histories, {
+        symbolMeta,
+        fxUsdKrw: { rates: [], fallback: fxNow },
+      });
+      anchorLastClose(mvNow, live.assets);
+      const cashflows = buildCashflows(allTxs, allHoldings, histories, fxNow);
+      const cumulative = applyCumulativeProfit(mvNow, cashflows);
+      setSeries({ assets, cumulative });
     }
 
     // Initial render with whatever's already cached.
@@ -177,21 +248,14 @@ export function usePortfolioFlow(
       recompute(loadLocal());
     });
 
-    // FX history sync — pull from server if local is empty or thin.
+    // FX history sync — always backfill from localMax+1 so the daily rate
+    // keeps flowing in. (Earlier shortcut bailed once localCount > 100 and
+    // left the settings rate card stuck on stale values.)
     void (async () => {
-      const localCount = fxHistoryRepo.listAll('USDKRW').length;
-      if (localCount > 100) return; // already populated enough
-      try {
-        const res = await fetch('/api/fx/history?pair=USDKRW&from=2020-01-01');
-        if (!res.ok) return;
-        const data = (await res.json()) as { rows: FxHistoryRow[] };
-        if (Array.isArray(data.rows) && data.rows.length > 0) {
-          fxHistoryRepo.append('USDKRW', data.rows);
-          if (!cancelled) recompute(loadLocal());
-        }
-      } catch {
-        /* swallow */
-      }
+      const before = fxHistoryRepo.getMaxDate('USDKRW');
+      await syncFxHistory(fetch, 'USDKRW');
+      const after = fxHistoryRepo.getMaxDate('USDKRW');
+      if (!cancelled && after !== before) recompute(loadLocal());
     })();
 
     return () => {
@@ -199,5 +263,5 @@ export function usePortfolioFlow(
     };
   }, [userId, marketKey, memberId, accountId]);
 
-  return rows;
+  return series;
 }

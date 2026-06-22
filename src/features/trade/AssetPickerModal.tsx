@@ -2,25 +2,22 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { X, Search, TrendingUp, Bitcoin, Coins, ChevronRight, CreditCard } from 'lucide-react';
+import { X, Search, ChevronRight, CreditCard } from 'lucide-react';
 import { ACCOUNT_TYPES, type AssetCategory, type MarketAsset } from '@/lib/schema';
 import { listMarketAssets } from '@/lib/market';
 import { accountsRepo, holdingsRepo } from '@/lib/repos';
 import { institutionSupports, listInstitutionsByKind } from '@/lib/institutions';
-import { getFxRate } from '@/lib/fx';
+import { formatPrice } from '@/lib/loans';
 import { assetDisplayName } from '@/lib/assetDisplay';
+import { categoryColor } from '@/lib/categoryColors';
 import { isAllInitials, matchesInitials } from '@/lib/hangulInitials';
 import { Modal } from '@/components/Modal';
+import { AssetCategoryIcon } from '@/components/AssetCategoryIcon';
 import { TradeForm } from '@/features/trade/TradeForm';
 import { useCurrentUserId, useMarketDataKey } from '@/components/AuthProvider';
+import { useTheme } from '@/hooks/useTheme';
 
 const CATEGORIES: (AssetCategory | '전체')[] = ['전체', ...ACCOUNT_TYPES];
-
-function icon(cat: AssetCategory) {
-  if (cat === '가상자산') return <Bitcoin size={18} />;
-  if (cat === '금') return <Coins size={18} />;
-  return <TrendingUp size={18} />;
-}
 
 interface Props {
   open: boolean;
@@ -167,6 +164,7 @@ export function AssetPickerModal({ open, onClose, onTraded }: Props) {
             name: assetDisplayName(selected),
             category: selected.category,
             currentPrice: selected.currentPrice,
+            currency: selected.currency,
           }}
           side="buy"
           onBack={() => setSelected(null)}
@@ -291,6 +289,7 @@ function PickerView({
   onSelect: (a: MarketAsset) => void;
   onClose: () => void;
 }) {
+  const { theme } = useTheme();
   return (
     <div className="flex flex-col flex-1 min-h-0">
       <div className="flex items-center justify-between px-6 pt-5 pb-3 shrink-0">
@@ -348,9 +347,11 @@ function PickerView({
                 onClick={() => onSelect(a)}
                 className="w-full flex items-center gap-3 px-3 py-3 rounded-2xl hover:bg-brand-surface active:bg-brand-surface text-left"
               >
-                <div className="w-10 h-10 rounded-2xl bg-brand-surface text-brand flex items-center justify-center shrink-0">
-                  {icon(a.category)}
-                </div>
+                <AssetCategoryIcon
+                  asset={a}
+                  color={categoryColor(a.category, theme)}
+                  size={40}
+                />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5">
                     <h4 className="text-sm font-bold text-brand-ink line-clamp-2 leading-tight">{assetDisplayName(a)}</h4>
@@ -366,11 +367,7 @@ function PickerView({
                 </div>
                 <div className="text-right shrink-0">
                   <p className="text-sm font-black text-brand-ink tabular-nums">
-                    {new Intl.NumberFormat('ko-KR').format(
-                      Math.round(
-                        a.currentPrice * (a.currency === 'USD' ? getFxRate('USDKRW') : 1),
-                      ),
-                    )}
+                    {formatPrice(a.currentPrice, a.currency)}
                   </p>
                   <p className={`text-[11px] font-black ${up ? 'text-brand-up' : 'text-brand-down'}`}>
                     {up ? '+' : ''}

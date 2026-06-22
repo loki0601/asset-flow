@@ -16,6 +16,7 @@ import { NextResponse } from 'next/server';
 import { fcmTokensRepo, getServerDb } from '@/server/db';
 import { sendToAll } from '@/server/fcm';
 import { eventVerb } from '@/lib/eventVerb';
+import { todaySeoulISO } from '@/lib/today';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -37,7 +38,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
 
-  const today = new Date().toISOString().slice(0, 10);
+  // KST date — the push fires at 08:00 KST, when the UTC date is still
+  // yesterday. Using the UTC date here summarised the wrong day and diverged
+  // from the Insights tab, which keys off the device-local (KST) date.
+  const today = todaySeoulISO();
   const db = getServerDb();
   const rows = db
     .prepare(
@@ -57,8 +61,9 @@ export async function POST(request: Request) {
   const items = rows.map((r) => {
     const tags = safeJsonArray(r.tags);
     const verb = eventVerb({ kind: r.kind, tags });
-    // Use symbol when present (tighter for a notification), fall back to name.
-    const label = r.symbol ?? r.name;
+    // Prefer the company name so the notification reads the same as the
+    // Insights tab (which shows the name, not the raw ticker).
+    const label = r.name || r.symbol || '';
     return `${label} ${verb.label}`;
   });
   const head = items.slice(0, 5).join(' · ');

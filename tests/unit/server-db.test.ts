@@ -10,6 +10,7 @@ import {
   setServerDbForTests,
   trackedSymbolsRepo,
   serverPriceHistoryRepo,
+  shouldBackfill,
 } from '@/server/db';
 
 beforeEach(() => {
@@ -60,6 +61,43 @@ describe('trackedSymbolsRepo', () => {
     trackedSymbolsRepo.setStatus('KRX:C', 'failed');
 
     expect(trackedSymbolsRepo.listReady()).toEqual(['KRX:B']);
+  });
+});
+
+describe('shouldBackfill (decision used by /api/prices/history/track)', () => {
+  it('returns true when the symbol has never been seen', () => {
+    expect(shouldBackfill(undefined)).toBe(true);
+  });
+
+  it('returns false while the previous backfill is still in flight', () => {
+    trackedSymbolsRepo.upsert('NASDAQ:PLTR');
+    expect(shouldBackfill(trackedSymbolsRepo.get('NASDAQ:PLTR'))).toBe(false);
+  });
+
+  it('returns false for a healthy ready row (source recorded)', () => {
+    trackedSymbolsRepo.upsert('NASDAQ:PLTR');
+    trackedSymbolsRepo.setStatus('NASDAQ:PLTR', 'ready');
+    trackedSymbolsRepo.setSource('NASDAQ:PLTR', 'fdr');
+    expect(shouldBackfill(trackedSymbolsRepo.get('NASDAQ:PLTR'))).toBe(false);
+  });
+
+  it('returns true on failed', () => {
+    trackedSymbolsRepo.upsert('NASDAQ:PLTR');
+    trackedSymbolsRepo.setStatus('NASDAQ:PLTR', 'failed');
+    expect(shouldBackfill(trackedSymbolsRepo.get('NASDAQ:PLTR'))).toBe(true);
+  });
+
+  // Regression: the bug that left PLTR/AMZN/UBER stuck on 6 days of history.
+  // backfill-symbol.py either never ran or got SIGKILLed before its UPDATE,
+  // yet somehow status flipped to 'ready' with source still NULL. Without
+  // self-heal, the existing.status !== 'failed' branch silently skips the
+  // re-spawn forever — the symbol is "ready" but anemic.
+  it('regression: returns true when status=ready but source is missing', () => {
+    trackedSymbolsRepo.upsert('NASDAQ:PLTR');
+    trackedSymbolsRepo.setStatus('NASDAQ:PLTR', 'ready');
+    // source intentionally never set — mirrors the production data
+    expect(trackedSymbolsRepo.get('NASDAQ:PLTR')?.source).toBeNull();
+    expect(shouldBackfill(trackedSymbolsRepo.get('NASDAQ:PLTR'))).toBe(true);
   });
 });
 

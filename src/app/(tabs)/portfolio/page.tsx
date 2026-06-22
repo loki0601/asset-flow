@@ -31,9 +31,6 @@ export default function PortfolioPage() {
   return (
     <>
       <div className="flex flex-col gap-6 pb-10">
-        <p className="px-2 text-brand-sage text-[10px] font-bold uppercase tracking-[0.2em] -mb-2">
-          Asset Allocation
-        </p>
         <AllocationDonut selected={selected} views={views} />
         <CategoryTabs selected={selected} onSelect={setSelected} available={availableCategories} />
         <div className="grid gap-4">

@@ -23,11 +23,20 @@ import {
   hasLocalCatalog,
   syncCatalog,
 } from '@/lib/catalog';
-import { getLastPriceSyncAt, syncLivePrices, syncPrices } from '@/lib/prices';
+import {
+  getLastPriceSyncAt,
+  needsDeepBackfill,
+  syncLivePrices,
+  syncPrices,
+  trackSymbolHistory,
+} from '@/lib/prices';
+import { syncFxHistory } from '@/lib/fx';
+import { prefetchHeldLogos, syncBrandIconManifest } from '@/lib/brandIconCache';
 import { holdingsRepo } from '@/lib/repos';
 import { initPush } from '@/lib/push';
 import { ingestNativePendingSync } from '@/lib/nativeSync';
 import { initStatusBar } from '@/lib/statusBar';
+import { initBackButton } from '@/lib/backButton';
 import { registerServiceWorker } from '@/lib/serviceWorker';
 
 interface AuthValue {
@@ -121,6 +130,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         } catch (err) {
           console.warn('[AuthProvider] live overlay skipped:', err);
         }
+      }
+      // FX sync is cheap (gap window only) and the rate card / FlowChart
+      // currency conversion both depend on it. Run it inside the manual
+      // refresh so the user can recover from a stuck rate by tapping the
+      // refresh button.
+      try {
+        await syncFxHistory(fetch, 'USDKRW');
+      } catch (err) {
+        console.warn('[AuthProvider] fx sync skipped:', err);
       }
       setState((prev) => ({
         ...prev,
@@ -220,8 +238,108 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
         })();
 
+        // Brand-icon manifest sync on boot — best-effort, ETag-cached.
+        // 304 on subsequent boots until the server's catalog changes,
+        // so the cost is one HEAD-like round trip after the first run.
+        // After the sync lands, warm the browser's HTTP cache for every
+        // held symbol's logo so the holdings card paints without a
+        // visible loading flash on first scroll.
+        (async () => {
+          try {
+            await syncBrandIconManifest(fetch);
+            if (cancelled) return;
+            if (userId) {
+              const heldSymbols = Array.from(
+                new Set(holdingsRepo.list(userId).map((h) => h.symbol)),
+              );
+              if (heldSymbols.length > 0) {
+                void prefetchHeldLogos(fetch, heldSymbols).catch(() => {
+                  /* prefetch is best-effort — render-time img tag retries */
+                });
+              }
+            }
+          } catch (err) {
+            console.warn('[AuthProvider] boot brand-icon sync skipped:', err);
+          }
+        })();
+
+        // FX sync on boot — runs independently of the price cooldown
+        // because the rate card is tiny and stale FX is what the user
+        // notices first (settings page can be opened without ever hitting
+        // dashboard, so usePortfolioFlow's hook isn't a reliable backstop).
+        if (userId) {
+          (async () => {
+            try {
+              await syncFxHistory(fetch, 'USDKRW');
+              if (!cancelled) {
+                setState((prev) => ({
+                  ...prev,
+                  pricesLastSyncAt: getLastPriceSyncAt(),
+                }));
+              }
+            } catch (err) {
+              console.warn('[AuthProvider] boot fx sync skipped:', err);
+            }
+          })();
+        }
+
+        // Prices sync on boot — throttled. FCM pushes are best-effort; if a
+        // push fails (server can't reach the device, app closed for days),
+        // the chart silently stays stale. Pulling on every cold start with a
+        // 15-min cooldown closes that hole without hammering the server on
+        // tab switches.
+        if (userId) {
+          (async () => {
+            try {
+              const heldSymbols = Array.from(
+                new Set(holdingsRepo.list(userId).map((h) => h.symbol)),
+              );
+              // Cooldown protects against bulk-price hammering on rapid
+              // app restarts. Bypass it when at least one held symbol still
+              // needs a deep-history pull — otherwise users who restarted
+              // mid-cooldown after a backfill schema change would be stuck
+              // with no historical rows until they tap refresh manually.
+              const last = getLastPriceSyncAt();
+              const lastMs = last ? new Date(last).getTime() : 0;
+              const COOLDOWN_MS = 15 * 60 * 1000;
+              if (
+                Date.now() - lastMs < COOLDOWN_MS &&
+                !needsDeepBackfill(heldSymbols)
+              ) {
+                return;
+              }
+              // Idempotent re-registration. trackSymbolHistory normally fires
+              // from TradeForm when a buy is recorded, but holdings created
+              // via other paths (onboarding, restored backup, older client
+              // versions) may have skipped it — leaving the server with no
+              // tracked_symbols row and the chart with no history rows for
+              // that symbol. Re-posting on boot recovers those.
+              for (const symbol of heldSymbols) trackSymbolHistory(symbol);
+              await syncPrices(fetch, heldSymbols);
+              if (heldSymbols.length > 0) {
+                try {
+                  await syncLivePrices(heldSymbols, fetch);
+                } catch (err) {
+                  console.warn('[AuthProvider] boot live overlay skipped:', err);
+                }
+              }
+              if (!cancelled) {
+                setState((prev) => ({
+                  ...prev,
+                  pricesLastSyncAt: getLastPriceSyncAt(),
+                }));
+              }
+            } catch (err) {
+              console.warn('[AuthProvider] boot price sync skipped:', err);
+            }
+          })();
+        }
+
         // Native Android: configure the status bar early so icons are visible.
         initStatusBar().catch((err) => console.warn('[AuthProvider] status bar init failed', err));
+
+        // Native Android: hardware back button → previous page (or close modal).
+        initBackButton().catch((err) => console.warn('[AuthProvider] back button init failed', err));
 
         // FCM registration — native Android only, no-op elsewhere.
         initPush().catch((err) => console.warn('[AuthProvider] push init failed', err));

@@ -168,6 +168,29 @@ export const trackedSymbolsRepo = {
   },
 };
 
+/**
+ * Decision used by POST /api/prices/history/track: should we (re)spawn the
+ * Python backfill worker for this symbol?
+ *
+ * The straightforward cases are first-registration (no row yet) and
+ * explicit prior failure. The non-obvious one is `status='ready'` with a
+ * NULL `source` — that combination means the daily-cron append loop has
+ * promoted the row to ready (it only operates on ready rows) but
+ * backfill-symbol.py never landed its UPDATE, so the symbol has a
+ * fraction of the history we'd expect. Without re-spawning here, the
+ * symbol is "ready" but anemic forever. Observed in production for
+ * PLTR/AMZN/UBER added in a single batch on 2026-05-17.
+ *
+ * Pending rows are deliberately *not* re-spawned — they signal an
+ * in-flight backfill, and a second spawn would race the first.
+ */
+export function shouldBackfill(existing: TrackedSymbol | undefined): boolean {
+  if (!existing) return true;
+  if (existing.status === 'failed') return true;
+  if (existing.status === 'ready' && !existing.source) return true;
+  return false;
+}
+
 export interface PriceRow {
   date: string;
   close: number;

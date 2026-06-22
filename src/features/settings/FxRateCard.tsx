@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { ArrowUpRight, ArrowDownRight, ArrowLeftRight } from 'lucide-react';
 import { fxHistoryRepo } from '@/lib/fxHistoryRepo';
-import { getFxRate } from '@/lib/fx';
+import { getFxRate, syncFxHistory } from '@/lib/fx';
 import { usePriceSync } from '@/components/AuthProvider';
 
 interface FxState {
@@ -23,17 +23,32 @@ export function FxRateCard() {
   });
 
   useEffect(() => {
-    const rows = fxHistoryRepo.listAll('USDKRW');
-    const fallback = getFxRate('USDKRW');
-    if (rows.length === 0) {
-      setState({ rate: fallback, change: null, changePct: null, asOf: null });
-      return;
+    let cancelled = false;
+    function readLocal() {
+      const rows = fxHistoryRepo.listAll('USDKRW');
+      const fallback = getFxRate('USDKRW');
+      if (rows.length === 0) {
+        setState({ rate: fallback, change: null, changePct: null, asOf: null });
+        return;
+      }
+      const latest = rows[rows.length - 1];
+      const prev = rows.length >= 2 ? rows[rows.length - 2] : null;
+      const change = prev ? latest.rate - prev.rate : null;
+      const changePct = prev && prev.rate > 0 ? (change! / prev.rate) * 100 : null;
+      setState({ rate: latest.rate, change, changePct, asOf: latest.date });
     }
-    const latest = rows[rows.length - 1];
-    const prev = rows.length >= 2 ? rows[rows.length - 2] : null;
-    const change = prev ? latest.rate - prev.rate : null;
-    const changePct = prev && prev.rate > 0 ? (change! / prev.rate) * 100 : null;
-    setState({ rate: latest.rate, change, changePct, asOf: latest.date });
+    // Read once with whatever's cached so the card paints immediately,
+    // then trigger a server sync. The settings page can be entered without
+    // first visiting the dashboard, so we can't rely on usePortfolioFlow's
+    // hook to backfill the missing days for us.
+    readLocal();
+    void (async () => {
+      await syncFxHistory(fetch, 'USDKRW');
+      if (!cancelled) readLocal();
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [pricesLastSyncAt]);
 
   const isUp = (state.change ?? 0) >= 0;

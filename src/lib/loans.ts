@@ -5,6 +5,26 @@ export function formatKRW(value: number): string {
   return new Intl.NumberFormat('ko-KR').format(Math.round(value));
 }
 
+export type PriceCurrency = 'KRW' | 'USD';
+
+/**
+ * Render a price with its native currency marker. USD adds a `$` prefix
+ * and keeps two decimal places (sub-dollar precision is real). KRW
+ * stays as the integer won with thousand separators — no symbol because
+ * the entire app is Korean-default and the ₩ is implicit context.
+ */
+export function formatPrice(value: number, currency: PriceCurrency): string {
+  if (currency === 'USD') {
+    const sign = value < 0 ? '-' : '';
+    const abs = Math.abs(value);
+    return `${sign}$${new Intl.NumberFormat('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(abs)}`;
+  }
+  return new Intl.NumberFormat('ko-KR').format(Math.round(value));
+}
+
 export function totalOutstanding(borrowed: number, repaid: number): number {
   return Math.max(0, borrowed - repaid);
 }
@@ -97,7 +117,7 @@ export function remainingLoanBalance(
   return (principal * (totalMonths - monthsPaid)) / totalMonths;
 }
 
-import type { Loan } from '@/lib/schema';
+import type { Loan, LoanStatus } from '@/lib/schema';
 
 /**
  * Live current-balance for a stored loan — derived from its contract terms
@@ -108,14 +128,16 @@ import type { Loan } from '@/lib/schema';
  *
  * Returns 0 if the loan is past maturity or the contract terms are unset.
  */
-export function currentLoanBalance(loan: Loan, now: Date = new Date()): number {
-  if (!loan.startDate || !loan.maturityDate) return loan.remainingAmount;
+/** Contract length and elapsed whole months from startDate → now, or null when
+ *  the loan's dates are missing/invalid. Shared by balance + payment recompute. */
+function loanTermMonths(
+  loan: Loan,
+  now: Date,
+): { totalMonths: number; monthsPaid: number } | null {
+  if (!loan.startDate || !loan.maturityDate) return null;
   const start = new Date(loan.startDate + 'T00:00:00Z');
   const maturity = new Date(loan.maturityDate + 'T00:00:00Z');
-  if (Number.isNaN(start.getTime()) || Number.isNaN(maturity.getTime())) {
-    return loan.remainingAmount;
-  }
-  // Total months derived from start → maturity (rounded).
+  if (Number.isNaN(start.getTime()) || Number.isNaN(maturity.getTime())) return null;
   const totalMonths = Math.max(
     1,
     Math.round(
@@ -123,7 +145,6 @@ export function currentLoanBalance(loan: Loan, now: Date = new Date()): number {
         (maturity.getUTCMonth() - start.getUTCMonth()),
     ),
   );
-  // Months elapsed: whole months between start and `now`, clamped.
   const monthsPaid = Math.max(
     0,
     Math.round(
@@ -132,11 +153,53 @@ export function currentLoanBalance(loan: Loan, now: Date = new Date()): number {
         (now.getUTCDate() < start.getUTCDate() ? 1 : 0),
     ),
   );
-  return remainingLoanBalance(
+  return { totalMonths, monthsPaid };
+}
+
+export function currentLoanBalance(loan: Loan, now: Date = new Date()): number {
+  const repaid = loan.repaid ?? 0;
+  const term = loanTermMonths(loan, now);
+  if (!term) return Math.max(0, loan.remainingAmount - repaid);
+  const scheduleBalance = remainingLoanBalance(
     loan.method,
     loan.totalAmount,
     loan.rate,
-    totalMonths,
-    monthsPaid,
+    term.totalMonths,
+    term.monthsPaid,
   );
+  return Math.max(0, scheduleBalance - repaid);
+}
+
+/**
+ * Live monthly payment for the loan as it stands NOW — recalculated on the
+ * current balance over the months remaining to maturity. For 만기일시상환 that's
+ * interest-only (balance × monthly rate), so it drops as principal is repaid;
+ * for amortising loans, recasting the current balance over the remaining term
+ * yields the same level payment when untouched, but a lower one after a
+ * prepayment. Display this instead of the stored `monthlyEst` snapshot so the
+ * figure always tracks the real balance.
+ */
+export function currentMonthlyPayment(loan: Loan, now: Date = new Date()): number {
+  const balance = currentLoanBalance(loan, now);
+  if (balance <= 0) return 0;
+  const term = loanTermMonths(loan, now);
+  const remainingMonths = term ? Math.max(1, term.totalMonths - term.monthsPaid) : 1;
+  return monthlyLoanPayment(loan.method, balance, loan.rate, remainingMonths);
+}
+
+/** Patch to persist after the user taps 상환 and enters an amount. The payment is
+ *  clamped to what's currently owed; the loan flips to 완료 when cleared. The
+ *  monthly figure isn't stored — it's derived live via currentMonthlyPayment. */
+export function applyRepayment(
+  loan: Loan,
+  amount: number,
+  now: Date = new Date(),
+): { repaid: number; remainingAmount: number; status: LoanStatus } {
+  const owed = currentLoanBalance(loan, now);
+  const pay = Math.max(0, Math.min(amount, owed));
+  const repaid = (loan.repaid ?? 0) + pay;
+  const remainingAmount = Math.round(currentLoanBalance({ ...loan, repaid }, now));
+  const status: LoanStatus =
+    remainingAmount <= 0 ? '완료' : loan.status === '완료' ? '상환 중' : loan.status;
+  return { repaid, remainingAmount, status };
 }

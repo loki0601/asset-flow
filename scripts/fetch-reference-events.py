@@ -90,14 +90,34 @@ def fetch_nasdaq_ipos(month_iso: str) -> list[dict]:
     except json.JSONDecodeError as e:
         print(f"  ipo decode {month_iso} failed: {e}", file=sys.stderr)
         return []
+    return extract_ipo_rows(data)
+
+
+def _section_rows(block: object) -> list[dict]:
+    """NASDAQ is inconsistent about where a section's rows live: `priced` and
+    `filed` expose `rows` directly, but `upcoming` nests them one level deeper
+    under `upcomingTable.rows`. Return rows from whichever shape is present."""
+    if not isinstance(block, dict):
+        return []
+    if isinstance(block.get("rows"), list):
+        return block["rows"]
+    for value in block.values():
+        if isinstance(value, dict) and isinstance(value.get("rows"), list):
+            return value["rows"]
+    return []
+
+
+def extract_ipo_rows(data: dict) -> list[dict]:
+    """priced + upcoming IPO rows, each tagged with `_section`.
+
+    The "filed" section is intentionally skipped — S-1 filings can be 6–18
+    months out and rarely drive short-term action; they used to dominate the
+    IPO category as noise. "priced" (deal closed) + "upcoming" (pricing this
+    week — where e.g. SpaceX/SPCX shows up) are what we keep.
+    """
     out: list[dict] = []
-    # Skip the "filed" section — S-1 filings can be 6–18 months out and rarely
-    # drive any short-term action; they used to dominate the IPO category and
-    # were judged not worth the noise. Keep priced (deal closed) + upcoming
-    # (pricing this week).
     for key in ("priced", "upcoming"):
-        section = (data.get(key) or {}).get("rows") or []
-        for row in section:
+        for row in _section_rows(data.get(key)):
             # Common fields: proposedTickerSymbol, companyName, pricedDate
             # (priced) or expectedPriceDate (upcoming), proposedSharePrice
             row["_section"] = key
@@ -187,7 +207,6 @@ SPAC_PATTERNS = (
     "acquisition v corp",
     "acquisition vi corp",
     "blank check",
-    "spac",
     "capital acquisition",
     "silverbox corp",      # numbered SPAC sponsors
     "gigcapital",
@@ -200,6 +219,10 @@ MIN_IPO_RAISE_USD = 100_000_000  # $100M minimum raise — filters out micro-IPO
 def is_spac(name: str, symbol: str | None = None) -> bool:
     n = name.lower()
     if any(p in n for p in SPAC_PATTERNS):
+        return True
+    # The literal acronym "SPAC" as a whole word — NOT as a substring, or
+    # "SPACE EXPLORATION TECHNOLOGIES" (SpaceX) gets misflagged via "spac"⊂"space".
+    if re.search(r"\bspac\b", n):
         return True
     # Generic catch: company name contains the word "acquisition" — SPACs are
     # the only common entity type that bakes that word into the corporate name.
@@ -875,6 +898,125 @@ def load_rank_history(
     return {sym: rank for sym, rank in rows}
 
 
+# Number of top-by-mcap symbols to compare when deciding whether the NDX
+# snapshot reflects a new US trading session. Pulling from the top keeps
+# the comparison stable — those names always have fresh prices when the
+# market trades, and they're never thinly-traded enough to skip a print.
+_SESSION_PROBE_SIZE = 20
+# Fraction of probed symbols that must match yesterday's pct for the
+# snapshot to count as "same session" (US market hasn't traded since).
+# 0.8 tolerates a handful of late-prints / data corrections without
+# unfreezing the scanner.
+_SESSION_SAME_THRESHOLD = 0.8
+# Lookback budget when yesterday's row is missing (cron failure, fresh DB).
+# We walk back at most this many days looking for *any* prior snapshot.
+_SESSION_LOOKBACK_DAYS = 14
+
+
+def is_new_us_session(
+    snapshot: list[dict], conn: sqlite3.Connection, today: date
+) -> bool:
+    """Returns True iff `snapshot` represents a US trading day that hasn't
+    yet been processed.
+
+    Without this guard, weekend & US-holiday cron runs re-record the most
+    recent Friday surge under each fresh KST date, producing duplicate
+    momentum events (the cron fires daily; NASDAQ keeps serving the same
+    `percentageChange` until a new US session ticks).
+
+    Heuristic: if the top-N symbols' pct values match the most recent
+    prior snapshot to within 0.01pp, the US market hasn't moved and we
+    short-circuit. When no prior snapshot exists (fresh DB), fail open
+    so the very first run still produces events.
+    """
+    if not snapshot:
+        return False
+    cur_by_symbol = {e["symbol"]: e.get("pct") for e in snapshot}
+    today_iso = today.isoformat()
+    # Walk back through dates looking for the latest stored snapshot
+    # strictly before today. Skip today itself — upsert_nasdaq100_daily
+    # writes today's row right before we're called, so reading `date < today`
+    # is what gives us "yesterday's" baseline.
+    cursor = conn.execute(
+        "SELECT date FROM nasdaq100_daily WHERE date < ? "
+        "ORDER BY date DESC LIMIT 1",
+        (today_iso,),
+    )
+    row = cursor.fetchone()
+    if row is None:
+        return True  # no baseline — first run, treat as new session
+    prev_date = row[0]
+    # Bail if the only prior snapshot is way too old to compare against.
+    try:
+        prev_d = date.fromisoformat(prev_date)
+        if (today - prev_d).days > _SESSION_LOOKBACK_DAYS:
+            return True
+    except ValueError:
+        return True
+    cursor = conn.execute(
+        "SELECT symbol, day_change_pct FROM nasdaq100_daily WHERE date = ?",
+        (prev_date,),
+    )
+    prev_pct = {sym: pct for sym, pct in cursor.fetchall()}
+    if not prev_pct:
+        return True
+    # Probe the top-N by mcap from today's snapshot.
+    probes = sorted(snapshot, key=lambda e: e.get("mcap") or 0, reverse=True)[:_SESSION_PROBE_SIZE]
+    compared = 0
+    matches = 0
+    for e in probes:
+        cur = cur_by_symbol.get(e["symbol"])
+        prv = prev_pct.get(e["symbol"])
+        if cur is None or prv is None:
+            continue
+        compared += 1
+        if abs(cur - prv) < 0.01:
+            matches += 1
+    if compared < _SESSION_PROBE_SIZE // 2:
+        # Too little overlap with the prior snapshot — symbol set drift,
+        # treat as new session rather than silently skipping.
+        return True
+    return matches / compared < _SESSION_SAME_THRESHOLD
+
+
+# How long a "milestone" momentum signal stays suppressed after first
+# firing.  Top-30 breakout and 5-day rank jumps both rely on a lookback
+# window, so the same condition persists for several consecutive days —
+# without a cooldown the holdings card shows the same milestone every
+# day for ~5 days (5d signals) or until the symbol falls back out of
+# the top-30 (breakout).
+MILESTONE_COOLDOWN_DAYS = 30
+
+
+def already_emitted_recently(
+    conn: sqlite3.Connection,
+    symbol: str,
+    tag: str,
+    days: int = MILESTONE_COOLDOWN_DAYS,
+    today: date | None = None,
+) -> bool:
+    """Returns True when the same (symbol, tag) momentum event has
+    already been emitted in the last `days` days. Used to gate
+    state-change signals like top-N breakout and 5d rank jumps so
+    they don't re-fire every cron run while the trigger condition
+    still holds.
+
+    Defensive: returns False (allow emit) when the reference_events
+    table doesn't exist yet — that's the first-ever cron run.
+    """
+    today = today or date.today()
+    cutoff = (today - timedelta(days=days)).isoformat()
+    try:
+        cur = conn.execute(
+            "SELECT 1 FROM reference_events WHERE kind = 'momentum' "
+            "AND symbol = ? AND tags LIKE ? AND date >= ? LIMIT 1",
+            (symbol, f'%"{tag}"%', cutoff),
+        )
+    except sqlite3.OperationalError:
+        return False
+    return cur.fetchone() is not None
+
+
 def scan_momentum_events(
     snapshot: list[dict], conn: sqlite3.Connection, today: date
 ) -> list[dict]:
@@ -948,11 +1090,16 @@ def scan_momentum_events(
                     tags=tags_base,
                 ))
 
-        # 5d rank jump (requires day-6+)
+        # 5d rank jump (requires day-6+). The 5-day window means the
+        # same jump satisfies the threshold for ~5 consecutive cron
+        # runs, so guard with the milestone cooldown to emit once per
+        # episode rather than once per day.
         prev5 = prev_5d.get(sym)
         if prev5:
             delta5 = prev5 - cur_rank
-            if delta5 >= MOMENTUM_5D_RANK_JUMP:
+            if delta5 >= MOMENTUM_5D_RANK_JUMP and not already_emitted_recently(
+                conn, sym, "rank-up-5d", today=today
+            ):
                 events.append(_mk_momentum_event(
                     sym, name, today_iso,
                     tag="rank-up-5d",
@@ -965,15 +1112,21 @@ def scan_momentum_events(
                     tags=tags_base,
                 ))
 
-        # Top-N breakout (entered top-30 within the last day or 5 days)
+        # Top-N breakout (entered top-30 within the last day or 5 days).
+        # Same problem as rank-up-5d — the "was outside ≤5 days ago"
+        # condition lingers, so without a cooldown the same milestone
+        # cards stack up day after day (5/29 APP + 5/30 APP regression).
+        breakout_tag = f"top{TOP_BREAKOUT_BAND}-breakout"
         if cur_rank <= TOP_BREAKOUT_BAND:
             was_outside = (prev and prev > TOP_BREAKOUT_BAND) or (
                 prev5 and prev5 > TOP_BREAKOUT_BAND
             )
-            if was_outside:
+            if was_outside and not already_emitted_recently(
+                conn, sym, breakout_tag, today=today
+            ):
                 events.append(_mk_momentum_event(
                     sym, name, today_iso,
-                    tag=f"top{TOP_BREAKOUT_BAND}-breakout",
+                    tag=breakout_tag,
                     title=f"{name} ({sym}) — NASDAQ-100 시총 TOP{TOP_BREAKOUT_BAND} 돌파",
                     detail=(
                         f"오늘 시총 {cur_rank}위 · TOP{TOP_BREAKOUT_BAND} 신규 진입 · "
@@ -1324,15 +1477,19 @@ def main() -> int:
             diff_events = diff_nasdaq100_events(previous, members, date.today())
             top30 = top_ndx_by_mcap(ndx_rows, 30)
             snapshot = upsert_nasdaq100_daily(conn, ndx_rows, date.today())
-            momentum_events = scan_momentum_events(snapshot, conn, date.today())
-            momentum_events.extend(
-                scan_sector_cluster_events(momentum_events, date.today())
-            )
+            if is_new_us_session(snapshot, conn, date.today()):
+                momentum_events = scan_momentum_events(snapshot, conn, date.today())
+                momentum_events.extend(
+                    scan_sector_cluster_events(momentum_events, date.today())
+                )
+                skipped_momentum = False
+            else:
+                skipped_momentum = True
             print(
                 f"NASDAQ-100 members refreshed: {len(members)} "
                 f"(prev {len(previous)}, diff events {len(diff_events)}, top30 mcap range "
                 f"${top30[0][2]/1e9:.0f}B–${top30[-1][2]/1e9:.0f}B, "
-                f"momentum {len(momentum_events)})",
+                f"momentum {'skipped (same US session as prior snapshot)' if skipped_momentum else len(momentum_events)})",
                 file=sys.stderr,
             )
         else:

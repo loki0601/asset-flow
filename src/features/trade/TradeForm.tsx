@@ -12,9 +12,9 @@ import {
 import type { Account, AssetCategory, FamilyMember, Holding, Transaction } from '@/lib/schema';
 import { accountsRepo, familyRepo, holdingsRepo, transactionsRepo } from '@/lib/repos';
 import { institutionSupports } from '@/lib/institutions';
-import { formatKRW } from '@/lib/loans';
+import { formatPrice, type PriceCurrency } from '@/lib/loans';
 import { valuationAmount, validateTradeInput } from '@/lib/holdings';
-import { applyBuy, applySell } from '@/lib/trade';
+import { applyBuy, applySell, formatPriceInput, preferredAccountId } from '@/lib/trade';
 import { trackSymbolHistory } from '@/lib/prices';
 import { useCurrentUserId } from '@/components/AuthProvider';
 
@@ -25,6 +25,9 @@ interface TradeAsset {
   name: string;
   category: AssetCategory;
   currentPrice: number;
+  /** Native pricing currency. US tickers price in USD; KR equities,
+   *  crypto, and gold all settle in KRW from the user's perspective. */
+  currency: PriceCurrency;
 }
 
 interface Props {
@@ -32,9 +35,15 @@ interface Props {
   side: TradeSide;
   onBack: () => void;
   onClose: () => void;
+  /** Narrow the account dropdown to accounts owned by this member.
+   *  `'all'` (default) keeps every category-matching account. Wired
+   *  from the dashboard's member filter — when the user is viewing
+   *  one member's holdings, the buy/sell dialog only offers that
+   *  member's accounts. */
+  memberId?: string | 'all';
 }
 
-export function TradeForm({ asset, side, onBack, onClose }: Props) {
+export function TradeForm({ asset, side, onBack, onClose, memberId = 'all' }: Props) {
   const userId = useCurrentUserId();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [members, setMembers] = useState<FamilyMember[]>([]);
@@ -47,15 +56,25 @@ export function TradeForm({ asset, side, onBack, onClose }: Props) {
 
   useEffect(() => {
     if (!userId) return;
-    const accs = accountsRepo.list(userId).filter((a) =>
-      institutionSupports(a.institution, asset.category),
-    );
+    const accs = accountsRepo
+      .list(userId)
+      .filter((a) => institutionSupports(a.institution, asset.category))
+      .filter((a) => memberId === 'all' || a.memberId === memberId);
     setAccounts(accs);
     setMembers(familyRepo.list(userId));
-    setAccountId((prev) => prev ?? accs[0]?.id ?? null);
+    // Prefer an account that already holds this symbol so the dialog
+    // defaults to where the position lives. With multiple held accounts
+    // the first in dropdown order wins; with none, fall back to the
+    // first candidate.
+    const preferred = preferredAccountId(
+      accs,
+      holdingsRepo.list(userId),
+      asset.symbol,
+    );
+    setAccountId((prev) => prev ?? preferred);
     // Reset date to today each time the form is mounted (e.g. new picker open)
     setDateStr(todayISODate());
-  }, [userId, asset.category]);
+  }, [userId, asset.category, asset.symbol, memberId]);
 
   // priceStr stays user-controlled; the current price is shown via placeholder
   // only, not pre-filled, so the user explicitly enters their fill price.
@@ -134,6 +153,9 @@ export function TradeForm({ asset, side, onBack, onClose }: Props) {
       quantity: qty,
       price,
       amount: expectedTotal,
+      // Snapshot the cost basis on sells so the ledger can show realized P&L.
+      // (existing is guaranteed non-null in the sell branch above.)
+      ...(isBuy ? {} : { avgCostAtSale: existing?.avgPrice }),
       occurredAt,
     };
     transactionsRepo.add(userId, tx);
@@ -163,8 +185,8 @@ export function TradeForm({ asset, side, onBack, onClose }: Props) {
           <p className={`text-[10px] font-black uppercase tracking-widest mb-2 ${isBuy ? 'text-brand-up' : 'text-brand-down'}`}>
             {sideLabel} 완료
           </p>
-          <p className="text-2xl font-black text-brand-ink mb-1">{formatKRW(expectedTotal)}</p>
-          <p className="text-xs text-brand-sage">{asset.name} · {qty}주 @ {formatKRW(price)}</p>
+          <p className="text-2xl font-black text-brand-ink mb-1">{formatPrice(expectedTotal, asset.currency)}</p>
+          <p className="text-xs text-brand-sage">{asset.name} · {qty}주 @ {formatPrice(price, asset.currency)}</p>
           <button
             onClick={onClose}
             className="mt-6 w-full bg-brand text-white py-3 rounded-2xl font-bold text-sm"
@@ -195,7 +217,7 @@ export function TradeForm({ asset, side, onBack, onClose }: Props) {
               {asset.name} {sideLabel}
             </h2>
             <p className="text-[10px] text-brand-sage font-bold uppercase tracking-widest truncate mt-0.5">
-              {asset.category} · 현재가 {formatKRW(asset.currentPrice)}
+              {asset.category} · 현재가 {formatPrice(asset.currentPrice, asset.currency)}
             </p>
           </div>
         </div>
@@ -236,13 +258,26 @@ export function TradeForm({ asset, side, onBack, onClose }: Props) {
         </Field>
 
         <Field label="주문 가격 (1주)">
-          <input
-            value={priceStr}
-            onChange={(e) => setPriceStr(formatWithCommas(e.target.value))}
-            inputMode="decimal"
-            placeholder={`현재가 ${formatKRW(asset.currentPrice)}`}
-            className="w-full bg-brand-surface px-4 py-3 rounded-2xl text-sm font-bold text-brand-ink focus:outline-none tabular-nums placeholder:text-brand-sage placeholder:font-medium"
-          />
+          <div className="relative">
+            {asset.currency === 'USD' && (
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-bold text-brand-ink pointer-events-none">
+                $
+              </span>
+            )}
+            <input
+              value={priceStr}
+              onChange={(e) => setPriceStr(formatPriceInput(e.target.value))}
+              inputMode="decimal"
+              placeholder={
+                asset.currency === 'USD'
+                  ? `현재가 ${asset.currentPrice.toFixed(2)}`
+                  : `현재가 ${formatPrice(asset.currentPrice, asset.currency)}`
+              }
+              className={`w-full bg-brand-surface py-3 rounded-2xl text-sm font-bold text-brand-ink focus:outline-none tabular-nums placeholder:text-brand-sage placeholder:font-medium ${
+                asset.currency === 'USD' ? 'pl-9 pr-4' : 'px-4'
+              }`}
+            />
+          </div>
         </Field>
 
         <Field label="수량">
@@ -269,7 +304,7 @@ export function TradeForm({ asset, side, onBack, onClose }: Props) {
           <div className="flex justify-between items-center">
             <span className="text-xs font-bold text-gray-500">예상 체결 금액</span>
             <span className="text-base font-black text-brand-ink tabular-nums">
-              {formatKRW(expectedTotal)}
+              {formatPrice(expectedTotal, asset.currency)}
             </span>
           </div>
         </div>
@@ -285,13 +320,6 @@ export function TradeForm({ asset, side, onBack, onClose }: Props) {
       </form>
     </>
   );
-}
-
-/** Format raw user input as 1,234,567 — strips non-digits then inserts commas. */
-function formatWithCommas(raw: string): string {
-  const digits = raw.replace(/[^\d]/g, '');
-  if (!digits) return '';
-  return Number(digits).toLocaleString('ko-KR');
 }
 
 function todayISODate(): string {

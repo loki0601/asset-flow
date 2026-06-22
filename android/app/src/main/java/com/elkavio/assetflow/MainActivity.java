@@ -1,7 +1,9 @@
 package com.elkavio.assetflow;
 
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
+import android.webkit.WebView;
 import androidx.appcompat.app.AppCompatDelegate;
 import com.getcapacitor.BridgeActivity;
 
@@ -36,5 +38,39 @@ public class MainActivity extends BridgeActivity {
                 AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
         }
         super.onCreate(savedInstanceState);
+        handleNavigateIntent(getIntent());
+    }
+
+    /** A notification tapped while the app is already running delivers its
+     *  intent here instead of onCreate. */
+    @Override
+    public void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        handleNavigateIntent(intent);
+    }
+
+    /**
+     * If the launching intent carries a "navigateRoute" extra (set by
+     * AssetflowMessagingService when a push notification is tapped), point the
+     * WebView at that in-app route. Posted onto the WebView so it runs after
+     * the bridge/page is ready on a cold start.
+     */
+    private void handleNavigateIntent(Intent intent) {
+        if (intent == null) return;
+        final String route = intent.getStringExtra("navigateRoute");
+        if (route == null || route.isEmpty()) return;
+        // Consume it so a later config-change/relaunch doesn't re-navigate.
+        intent.removeExtra("navigateRoute");
+        if (getBridge() == null) return;
+        final WebView webView = getBridge().getWebView();
+        if (webView == null) return;
+        final String js = "window.location.assign(" + jsString(route) + ")";
+        webView.postDelayed(() -> webView.evaluateJavascript(js, null), 350);
+    }
+
+    /** Minimal JS string literal escaping for the route path. */
+    private static String jsString(String s) {
+        return "'" + s.replace("\\", "\\\\").replace("'", "\\'") + "'";
     }
 }

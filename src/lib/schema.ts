@@ -101,6 +101,10 @@ export interface Transaction {
   price?: number;
   amount: number;
   fee?: number;
+  /** Average purchase price at the moment of a sell (native currency),
+   *  snapshotted so the 거래 이력 can show realized P&L. Only set on 'sell'
+   *  transactions recorded after the feature shipped — older sells lack it. */
+  avgCostAtSale?: number;
   occurredAt: string;
   memo?: string;
 }
@@ -118,6 +122,9 @@ export interface Loan {
   bank: string;
   totalAmount: number;
   remainingAmount: number;
+  /** Cumulative manual repayments (extra principal paid via the 상환 button),
+   *  subtracted from the contract-derived balance. Absent on older loans → 0. */
+  repaid?: number;
   method: LoanMethod;
   rate: number;
   startDate: string;

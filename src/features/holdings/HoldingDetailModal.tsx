@@ -16,9 +16,13 @@ interface Props {
   open: boolean;
   onClose: () => void;
   view: HoldingView;
+  /** Member filter active on the parent screen. Forwarded to TradeForm
+   *  so the account dropdown only offers that member's accounts when
+   *  the user opened the holding from a filtered view. */
+  memberId?: string | 'all';
 }
 
-export function HoldingDetailModal({ open, onClose, view }: Props) {
+export function HoldingDetailModal({ open, onClose, view, memberId = 'all' }: Props) {
   const [tradeSide, setTradeSide] = useState<TradeSide | null>(null);
 
   useEffect(() => {
@@ -39,10 +43,12 @@ export function HoldingDetailModal({ open, onClose, view }: Props) {
             name: assetDisplayName(view.asset),
             category: view.category,
             currentPrice: view.asset.currentPrice,
+            currency: view.asset.currency,
           }}
           side={tradeSide}
           onBack={() => setTradeSide(null)}
           onClose={handleClose}
+          memberId={memberId}
         />
       ) : (
         <DetailView view={view} onClose={handleClose} onTrade={setTradeSide} />

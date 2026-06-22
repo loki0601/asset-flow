@@ -55,13 +55,19 @@ public class AssetflowMessagingService extends MessagingService {
         String title = data.get("title");
         String body = data.get("body");
         if (title != null || body != null) {
-            showNotification(title != null ? title : "AssetFlow", body != null ? body : "");
+            showNotification(title != null ? title : "AssetFlow", body != null ? body : "", action);
         }
         // Delegate to Capacitor's parent so foreground JS handlers also fire.
         super.onMessageReceived(remoteMessage);
     }
 
-    private void showNotification(String title, String body) {
+    /** Map a push action to the in-app route its notification should open. */
+    private static String routeForAction(String action) {
+        if ("insights".equals(action)) return "/insights";
+        return null;
+    }
+
+    private void showNotification(String title, String body, String action) {
         try {
             NotificationManager nm = getSystemService(NotificationManager.class);
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && nm != null) {
@@ -73,8 +79,16 @@ public class AssetflowMessagingService extends MessagingService {
             }
             Intent openApp = new Intent(this, MainActivity.class);
             openApp.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+            // Carry the target route so MainActivity can deep-link the WebView
+            // to the right tab when the user taps this notification.
+            String route = routeForAction(action);
+            int requestCode = 0;
+            if (route != null) {
+                openApp.putExtra("navigateRoute", route);
+                requestCode = route.hashCode();
+            }
             PendingIntent pending = PendingIntent.getActivity(
-                    this, 0, openApp,
+                    this, requestCode, openApp,
                     PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
             NotificationCompat.Builder b = new NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
                     .setSmallIcon(android.R.drawable.stat_notify_sync)

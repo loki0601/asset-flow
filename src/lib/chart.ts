@@ -1,18 +1,24 @@
+export interface PathRange {
+  min: number;
+  max: number;
+}
+
 export function generateLinePath(
   prices: number[],
   viewBoxX = 100,
   viewBoxY = 100,
+  range?: PathRange,
 ): string {
   if (prices.length < 2) return '';
-  const min = Math.min(...prices);
-  const max = Math.max(...prices);
-  const range = max - min || 1;
+  const min = range?.min ?? Math.min(...prices);
+  const max = range?.max ?? Math.max(...prices);
+  const span = max - min || 1;
   const steps = prices.length - 1;
 
   return prices
     .map((p, i) => {
       const x = (i / steps) * viewBoxX;
-      const y = viewBoxY - ((p - min) / range) * viewBoxY;
+      const y = viewBoxY - ((p - min) / span) * viewBoxY;
       const cmd = i === 0 ? 'M' : 'L';
       return `${cmd}${stripZero(x)},${stripZero(y)}`;
     })
@@ -28,18 +34,19 @@ export function generateSmoothLinePath(
   prices: number[],
   viewBoxX = 100,
   viewBoxY = 100,
+  range?: PathRange,
 ): string {
   if (prices.length < 2) return '';
-  if (prices.length === 2) return generateLinePath(prices, viewBoxX, viewBoxY);
+  if (prices.length === 2) return generateLinePath(prices, viewBoxX, viewBoxY, range);
 
-  const min = Math.min(...prices);
-  const max = Math.max(...prices);
-  const range = max - min || 1;
+  const min = range?.min ?? Math.min(...prices);
+  const max = range?.max ?? Math.max(...prices);
+  const span = max - min || 1;
   const steps = prices.length - 1;
 
   const pts = prices.map((p, i) => ({
     x: (i / steps) * viewBoxX,
-    y: viewBoxY - ((p - min) / range) * viewBoxY,
+    y: viewBoxY - ((p - min) / span) * viewBoxY,
   }));
 
   let path = `M${stripZero(pts[0].x)},${stripZero(pts[0].y)}`;
@@ -61,8 +68,9 @@ export function generateSmoothAreaPath(
   prices: number[],
   viewBoxX = 100,
   viewBoxY = 100,
+  range?: PathRange,
 ): string {
-  const line = generateSmoothLinePath(prices, viewBoxX, viewBoxY);
+  const line = generateSmoothLinePath(prices, viewBoxX, viewBoxY, range);
   if (!line) return '';
   return `${line} L${stripZero(viewBoxX)},${stripZero(viewBoxY)} L0,${stripZero(viewBoxY)} Z`;
 }
@@ -71,8 +79,9 @@ export function generateAreaPath(
   prices: number[],
   viewBoxX = 100,
   viewBoxY = 100,
+  range?: PathRange,
 ): string {
-  const line = generateLinePath(prices, viewBoxX, viewBoxY);
+  const line = generateLinePath(prices, viewBoxX, viewBoxY, range);
   if (!line) return '';
   return `${line} L${stripZero(viewBoxX)},${stripZero(viewBoxY)} L0,${stripZero(viewBoxY)} Z`;
 }

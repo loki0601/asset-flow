@@ -10,6 +10,10 @@ const WINDOW_SIZE: Record<ChartMode, number> = { D: 60, W: 26, Y: 10 };
 const TAP_THRESHOLD_PX = 8;
 const Y_TICKS = 4;
 const X_LABEL_COUNT = 5;
+// Vertical breathing room (as a fraction of data range) reserved at the top
+// and bottom of the SVG so peak/trough strokes — including Bezier overshoot
+// from the Catmull-Rom smoothing — aren't clipped by the chart edge.
+const Y_PAD_PCT = 0.08;
 
 interface Props {
   rows: PriceHistoryRow[];
@@ -53,8 +57,6 @@ export function InteractivePriceChart({
   const visible = points.slice(start, end);
 
   const closes = visible.map((p) => p.close);
-  const linePath = closes.length >= 2 ? generateSmoothLinePath(closes) : '';
-  const areaPath = closes.length >= 2 ? generateSmoothAreaPath(closes) : '';
   // Stock chart line stays brand green regardless of direction. The
   // up/down semantic lives elsewhere (text/badges) — here the curve is
   // just a visualisation of the price series.
@@ -64,6 +66,12 @@ export function InteractivePriceChart({
   const minClose = closes.length > 0 ? Math.min(...closes) : 0;
   const maxClose = closes.length > 0 ? Math.max(...closes) : 0;
   const yRange = maxClose - minClose || 1;
+  const paddedMin = minClose - yRange * Y_PAD_PCT;
+  const paddedMax = maxClose + yRange * Y_PAD_PCT;
+  const paddedRange = paddedMax - paddedMin;
+  const pathRange = { min: paddedMin, max: paddedMax };
+  const linePath = closes.length >= 2 ? generateSmoothLinePath(closes, 100, 100, pathRange) : '';
+  const areaPath = closes.length >= 2 ? generateSmoothAreaPath(closes, 100, 100, pathRange) : '';
 
   // Marker clamps into the current visible window. Reset when mode flips
   // (the underlying point set changes) or when nothing's visible.
@@ -149,13 +157,18 @@ export function InteractivePriceChart({
   }
 
   // ─── Layout helpers ──────────────────────────────────────────────────
+  // Tick values stay anchored to the real data range (maxClose..minClose),
+  // but their positions are computed inside the padded space so the top tick
+  // sits Y_PAD_PCT below the chart's top edge instead of flush against it —
+  // matching where the line actually peaks.
   const yTicks = useMemo(() => {
     if (closes.length === 0) return [] as { value: number; pct: number }[];
     return Array.from({ length: Y_TICKS + 1 }, (_, i) => {
       const value = maxClose - (yRange * i) / Y_TICKS;
-      return { value, pct: (i / Y_TICKS) * 100 };
+      const pct = ((paddedMax - value) / paddedRange) * 100;
+      return { value, pct };
     });
-  }, [closes.length, maxClose, yRange]);
+  }, [closes.length, maxClose, yRange, paddedMax, paddedRange]);
 
   const xLabels = useMemo(() => {
     if (visible.length === 0) return [] as { date: string; pct: number }[];
@@ -171,7 +184,7 @@ export function InteractivePriceChart({
   const markerX =
     markerIdx !== null && visible.length > 1 ? (markerIdx / (visible.length - 1)) * 100 : 0;
   const markerY =
-    markerRow !== null ? 100 - ((markerRow.close - minClose) / yRange) * 100 : 0;
+    markerRow !== null ? 100 - ((markerRow.close - paddedMin) / paddedRange) * 100 : 0;
 
   return (
     <div className={className}>

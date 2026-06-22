@@ -1,12 +1,15 @@
 import { describe, it, expect } from 'vitest';
 import {
   formatKRW,
+  formatPrice,
   totalOutstanding,
   repaymentProgress,
   loanProgressRatio,
   monthlyLoanPayment,
   remainingLoanBalance,
   currentLoanBalance,
+  currentMonthlyPayment,
+  applyRepayment,
 } from '@/lib/loans';
 import type { Loan } from '@/lib/schema';
 
@@ -178,6 +181,104 @@ describe('currentLoanBalance', () => {
     const v = currentLoanBalance(baseLoan({}), new Date('2060-01-01T12:00:00Z'));
     expect(v).toBe(0);
   });
+
+  it('subtracts the manual repaid amount from the schedule balance', () => {
+    const bullet = baseLoan({ method: '만기일시상환', maturityDate: '2027-04-25', repaid: 30_000_000 });
+    expect(currentLoanBalance(bullet, new Date('2026-05-18T12:00:00Z'))).toBe(70_000_000);
+  });
+});
+
+describe('applyRepayment', () => {
+  const bullet = (overrides: Partial<Loan> = {}): Loan => ({
+    id: 'l',
+    userId: 'u',
+    memberId: 'm',
+    name: '',
+    bank: '',
+    totalAmount: 100_000_000,
+    remainingAmount: 100_000_000,
+    method: '만기일시상환',
+    rate: 4,
+    startDate: '2025-04-25',
+    maturityDate: '2027-04-25',
+    paymentDay: 25,
+    monthlyEst: 0,
+    status: '상환 중',
+    createdAt: '',
+    ...overrides,
+  });
+  const now = new Date('2026-05-18T12:00:00Z');
+
+  it('records a partial repayment and lowers the remaining balance', () => {
+    const patch = applyRepayment(bullet(), 30_000_000, now);
+    expect(patch.repaid).toBe(30_000_000);
+    expect(patch.remainingAmount).toBe(70_000_000);
+    expect(patch.status).toBe('상환 중');
+  });
+
+
+  it('accumulates onto a prior repaid amount', () => {
+    const patch = applyRepayment(bullet({ repaid: 30_000_000 }), 20_000_000, now);
+    expect(patch.repaid).toBe(50_000_000);
+    expect(patch.remainingAmount).toBe(50_000_000);
+  });
+
+  it('clamps an overpayment to what is owed and marks the loan 완료', () => {
+    const patch = applyRepayment(bullet(), 200_000_000, now);
+    expect(patch.repaid).toBe(100_000_000);
+    expect(patch.remainingAmount).toBe(0);
+    expect(patch.status).toBe('완료');
+  });
+
+  it('ignores a non-positive amount', () => {
+    expect(applyRepayment(bullet({ repaid: 10_000_000 }), 0, now).repaid).toBe(10_000_000);
+    expect(applyRepayment(bullet({ repaid: 10_000_000 }), -5, now).repaid).toBe(10_000_000);
+  });
+});
+
+describe('currentMonthlyPayment', () => {
+  const loan = (overrides: Partial<Loan> = {}): Loan => ({
+    id: 'l',
+    userId: 'u',
+    memberId: 'm',
+    name: '',
+    bank: '',
+    totalAmount: 40_000_000,
+    remainingAmount: 40_000_000,
+    method: '원리금균등상환',
+    rate: 3.5,
+    startDate: '2025-12-01',
+    maturityDate: '2055-12-01', // 360 months
+    paymentDay: 20,
+    monthlyEst: 0,
+    status: '상환 중',
+    createdAt: '',
+    ...overrides,
+  });
+  const now = new Date('2026-06-01T12:00:00Z');
+
+  it('원리금균등: untouched loan keeps its level payment', () => {
+    // 40M / 3.5% / 360mo level payment ≈ 179,618; recasting the current
+    // balance over the remaining term reproduces it (no prepayment).
+    expect(Math.round(currentMonthlyPayment(loan(), now))).toBe(179_618);
+  });
+
+  it('원리금균등: drops after a prepayment (recast on the lower balance)', () => {
+    const before = currentMonthlyPayment(loan(), now);
+    const after = currentMonthlyPayment(loan({ repaid: 20_000_000 }), now);
+    expect(after).toBeLessThan(before);
+    expect(after).toBeGreaterThan(0);
+  });
+
+  it('만기일시: interest only on the current balance', () => {
+    const bullet = loan({ method: '만기일시상환', repaid: 30_000_000 });
+    // balance 10M, 3.5% → 10M × 0.035/12
+    expect(Math.round(currentMonthlyPayment(bullet, now))).toBe(Math.round(10_000_000 * (0.035 / 12)));
+  });
+
+  it('returns 0 once fully repaid', () => {
+    expect(currentMonthlyPayment(loan({ repaid: 40_000_000 }), now)).toBe(0);
+  });
 });
 
 describe('loanProgressRatio', () => {
@@ -191,5 +292,23 @@ describe('loanProgressRatio', () => {
 
   it('returns 100 when fully paid', () => {
     expect(loanProgressRatio(100, 0)).toBe(100);
+  });
+});
+
+describe('formatPrice', () => {
+  it('USD: prefixes with $ and keeps two decimals', () => {
+    expect(formatPrice(138.55, 'USD')).toBe('$138.55');
+    expect(formatPrice(1234.5, 'USD')).toBe('$1,234.50');
+    expect(formatPrice(0, 'USD')).toBe('$0.00');
+  });
+
+  it('USD: negative values get a leading minus before the $', () => {
+    expect(formatPrice(-12.5, 'USD')).toBe('-$12.50');
+  });
+
+  it('KRW: no symbol — matches the existing formatKRW output', () => {
+    expect(formatPrice(1234567, 'KRW')).toBe('1,234,567');
+    expect(formatPrice(70_000.4, 'KRW')).toBe('70,000');
+    expect(formatPrice(0, 'KRW')).toBe('0');
   });
 });

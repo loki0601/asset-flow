@@ -22,6 +22,7 @@
   },
   "dependencies": {
     "@capacitor/android": "^6.1.2",
+    "@capacitor/app": "^6.0.3",
     "@capacitor/core": "^6.1.2",
     "@capacitor/filesystem": "^8.1.2",
     "@capacitor/preferences": "^6.0.4",
@@ -36,6 +37,7 @@
     "pino": "^8.17.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "simple-icons": "^16.21.0",
     "sql.js": "^1.14.1",
     "zod": "^3.22.0"
   },

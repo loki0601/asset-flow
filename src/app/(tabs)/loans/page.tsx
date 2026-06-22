@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { HandCoins } from 'lucide-react';
 import type { Loan } from '@/lib/schema';
 import { loansRepo } from '@/lib/repos';
+import { applyRepayment } from '@/lib/loans';
 import { LoanSummaryCard } from '@/features/loans/LoanSummaryCard';
 import { LoanAccountCard } from '@/features/loans/LoanAccountCard';
 import { EmptyState } from '@/components/EmptyState';
@@ -18,12 +19,17 @@ export default function LoansPage() {
     setLoans(loansRepo.list(userId));
   }, [userId]);
 
+  function handleRepay(loanId: string, amount: number) {
+    if (!userId) return;
+    const loan = loansRepo.get(userId, loanId);
+    if (!loan) return;
+    loansRepo.update(userId, loanId, applyRepayment(loan, amount));
+    setLoans(loansRepo.list(userId));
+  }
+
   return (
     <div className="pb-10">
-      <p className="px-2 text-brand-sage text-[10px] font-bold uppercase tracking-[0.2em] mb-2">
-        Total Debts
-      </p>
-      <LoanSummaryCard />
+      <LoanSummaryCard loans={loans} />
 
       <div className="flex justify-between items-end mb-4 mt-6 px-2">
         <h3 className="text-lg font-black italic text-brand-ink tracking-tight">Loan Accounts</h3>
@@ -38,7 +44,11 @@ export default function LoansPage() {
       ) : (
         <div className="space-y-5">
           {loans.map((loan) => (
-            <LoanAccountCard key={loan.id} loan={loan} />
+            <LoanAccountCard
+              key={loan.id}
+              loan={loan}
+              onRepay={(amount) => handleRepay(loan.id, amount)}
+            />
           ))}
         </div>
       )}

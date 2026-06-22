@@ -7,7 +7,13 @@ import { formatKRW, currentLoanBalance } from '@/lib/loans';
 import { LoanDetailModal } from './LoanDetailModal';
 import { card } from '@/lib/cardStyles';
 
-export function LoanAccountCard({ loan }: { loan: Loan }) {
+export function LoanAccountCard({
+  loan,
+  onRepay,
+}: {
+  loan: Loan;
+  onRepay?: (amount: number) => void;
+}) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -38,7 +44,7 @@ export function LoanAccountCard({ loan }: { loan: Loan }) {
         </div>
       </button>
 
-      <LoanDetailModal open={open} onClose={() => setOpen(false)} loan={loan} />
+      <LoanDetailModal open={open} onClose={() => setOpen(false)} loan={loan} onRepay={onRepay} />
     </>
   );
 }

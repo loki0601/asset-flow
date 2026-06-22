@@ -5,19 +5,20 @@ import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard,
   PieChart,
+  ArrowLeftRight,
   HandCoins,
   HeartPulse,
   Lightbulb,
-  Settings,
 } from 'lucide-react';
 
+// 설정 lives in the top AppBar (gear icon) — not the bottom nav.
 const TABS = [
   { href: '/dashboard', icon: LayoutDashboard, label: '대시보드' },
   { href: '/portfolio', icon: PieChart, label: '포트폴리오' },
+  { href: '/transactions', icon: ArrowLeftRight, label: '거래' },
   { href: '/loans', icon: HandCoins, label: '대출' },
   { href: '/retirement', icon: HeartPulse, label: '노후' },
   { href: '/insights', icon: Lightbulb, label: '인사이트' },
-  { href: '/settings', icon: Settings, label: '설정' },
 ] as const;
 
 export function BottomTabs() {

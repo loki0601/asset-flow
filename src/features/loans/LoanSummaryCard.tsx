@@ -1,24 +1,19 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import type { Loan } from '@/lib/schema';
-import { loansRepo } from '@/lib/repos';
-import { formatKRW, totalOutstanding, repaymentProgress, currentLoanBalance } from '@/lib/loans';
-import { useCurrentUserId } from '@/components/AuthProvider';
+import {
+  formatKRW,
+  totalOutstanding,
+  repaymentProgress,
+  currentLoanBalance,
+  currentMonthlyPayment,
+} from '@/lib/loans';
 
-export function LoanSummaryCard() {
-  const userId = useCurrentUserId();
-  const [loans, setLoans] = useState<Loan[]>([]);
-
-  useEffect(() => {
-    if (!userId) return;
-    setLoans(loansRepo.list(userId));
-  }, [userId]);
-
+export function LoanSummaryCard({ loans }: { loans: Loan[] }) {
   const totalBorrowed = loans.reduce((s, l) => s + l.totalAmount, 0);
   const remaining = loans.reduce((s, l) => s + currentLoanBalance(l), 0);
   const totalRepaid = totalBorrowed - remaining;
-  const monthlyPayment = loans.reduce((s, l) => s + l.monthlyEst, 0);
+  const monthlyPayment = loans.reduce((s, l) => s + currentMonthlyPayment(l), 0);
   const outstanding = totalOutstanding(totalBorrowed, totalRepaid);
   const progress = repaymentProgress(totalBorrowed, totalRepaid);
 

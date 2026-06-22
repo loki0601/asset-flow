@@ -10,7 +10,12 @@ import {
 } from '@/lib/db';
 import { setStorage } from '@/lib/storage';
 import { listLocalAssets, setLocalCatalog } from '@/lib/catalog';
-import { getLastPriceSyncAt, syncPrices, type PricePayload } from '@/lib/prices';
+import {
+  getLastPriceSyncAt,
+  markFullBackfilled,
+  syncPrices,
+  type PricePayload,
+} from '@/lib/prices';
 import { priceHistoryRepo } from '@/lib/priceHistoryRepo';
 import type { MarketAsset } from '@/lib/schema';
 
@@ -186,6 +191,7 @@ describe('syncPrices — history sync (held symbols)', () => {
       { date: '2026-05-13', close: 1080 },
       { date: '2026-05-14', close: 1090 },
     ]);
+    markFullBackfilled('KRX:A');
 
     // history handler intentionally throws if hit — to assert no call made
     let historyCalled = false;
@@ -209,6 +215,7 @@ describe('syncPrices — history sync (held symbols)', () => {
   it('already in sync (local_max == latest business day) → no-op', async () => {
     setLocalCatalog('1.0.0', [asset('KRX:A')]);
     priceHistoryRepo.append('KRX:A', [{ date: '2026-05-15', close: 1100 }]);
+    markFullBackfilled('KRX:A');
 
     let historyCalled = false;
     const fetch = (async (input: RequestInfo | URL) => {
@@ -225,24 +232,94 @@ describe('syncPrices — history sync (held symbols)', () => {
     expect(priceHistoryRepo.listSince('KRX:A', '2026-01-01')).toHaveLength(1);
   });
 
-  it('2+ business-day gap → skip per requirement (no history call, no append)', async () => {
+  // Regression for the PLTR/AMZN/UBER case: client had a thin localMax window
+  // (only the daily-cron-appended rows starting from 5-18), so the gap-fast-path
+  // requested from=localMax+1 forever and never asked the server for the deep
+  // history that backfill-symbol.py had since populated. The deep-backfill flag
+  // makes the very first sync after deploy pull the full window once.
+  it('regression: localMax exists but deep-backfill flag missing → fetches full history once', async () => {
     setLocalCatalog('1.0.0', [asset('KRX:A')]);
-    priceHistoryRepo.append('KRX:A', [{ date: '2026-05-13', close: 1080 }]);
-    // gap is now 2 business days (13 → 14, 14 → 15)
+    // Thin local cache mimicking the daily-cron append over a few days
+    priceHistoryRepo.append('KRX:A', [
+      { date: '2026-05-13', close: 1080 },
+      { date: '2026-05-14', close: 1090 },
+      { date: '2026-05-15', close: 1100 },
+    ]);
+    // flag is intentionally absent
 
-    let historyCalled = false;
+    const historyUrls: string[] = [];
     const fetch = (async (input: RequestInfo | URL) => {
       const url = String(input);
       if (url.startsWith('/api/prices/history')) {
-        historyCalled = true;
+        historyUrls.push(url);
+        return new Response(
+          JSON.stringify({
+            symbol: 'KRX:A',
+            status: 'ready',
+            rows: [
+              { date: '2020-01-02', close: 500 },
+              { date: '2020-01-03', close: 510 },
+              { date: '2026-05-13', close: 1080 },
+              { date: '2026-05-14', close: 1090 },
+              { date: '2026-05-15', close: 1100 },
+            ],
+          }),
+          { status: 200 },
+        );
       }
       return new Response(JSON.stringify(pricesPayload()), { status: 200 });
     }) as unknown as typeof fetch;
 
     await syncPrices(fetch, ['KRX:A']);
 
-    expect(historyCalled).toBe(false);
-    expect(priceHistoryRepo.getMaxDate('KRX:A')).toBe('2026-05-13'); // untouched
+    // The first call must use the FULL_BACKFILL_FROM date (currently
+    // 2016-01-01), not localMax+1. That's what brings back the missing
+    // pre-5/18 history in production.
+    expect(historyUrls.length).toBeGreaterThanOrEqual(1);
+    expect(historyUrls[0]).toContain('from=2016-01-01');
+    expect(priceHistoryRepo.listSince('KRX:A', '2000-01-01').length).toBe(5);
+
+    // Second sync of the same symbol: flag is now set, so we revert to the
+    // tight gap path (no second full fetch from 2016-01-01).
+    historyUrls.length = 0;
+    await syncPrices(fetch, ['KRX:A']);
+    for (const u of historyUrls) {
+      expect(u).not.toContain('from=2016-01-01');
+    }
+  });
+
+  it('2+ business-day gap → backfills missing rows via /api/prices/history?from=localMax+1', async () => {
+    setLocalCatalog('1.0.0', [asset('KRX:A')]);
+    priceHistoryRepo.append('KRX:A', [{ date: '2026-05-13', close: 1080 }]);
+    markFullBackfilled('KRX:A');
+    // gap is now 2 business days (13 → 14, 14 → 15)
+
+    let historyUrl: string | null = null;
+    const fetch = (async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.startsWith('/api/prices/history')) {
+        historyUrl = url;
+        return new Response(
+          JSON.stringify({
+            symbol: 'KRX:A',
+            status: 'ready',
+            rows: [
+              { date: '2026-05-14', close: 1090 },
+              { date: '2026-05-15', close: 1100 },
+            ],
+          }),
+          { status: 200 },
+        );
+      }
+      return new Response(JSON.stringify(pricesPayload()), { status: 200 });
+    }) as unknown as typeof fetch;
+
+    await syncPrices(fetch, ['KRX:A']);
+
+    expect(historyUrl).toContain('symbol=KRX%3AA');
+    expect(historyUrl).toContain('from=2026-05-14');
+    expect(priceHistoryRepo.getMaxDate('KRX:A')).toBe('2026-05-15');
+    expect(priceHistoryRepo.listSince('KRX:A', '2026-01-01')).toHaveLength(3);
   });
 
   it('symbol not in bulk payload → skipped (no append)', async () => {

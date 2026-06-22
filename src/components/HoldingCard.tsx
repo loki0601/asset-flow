@@ -1,8 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { TrendingUp } from 'lucide-react';
 import type { HoldingView } from '@/hooks/useHoldingsView';
+import { AssetCategoryIcon } from '@/components/AssetCategoryIcon';
 import { HoldingDetailModal } from '@/features/holdings/HoldingDetailModal';
 import { card } from '@/lib/cardStyles';
 import { formatKRW } from '@/lib/loans';
@@ -10,7 +10,17 @@ import { assetDisplayName } from '@/lib/assetDisplay';
 import { categoryColor } from '@/lib/categoryColors';
 import { useTheme } from '@/hooks/useTheme';
 
-export function HoldingCard({ view, onAfterTrade }: { view: HoldingView; onAfterTrade?: () => void }) {
+export function HoldingCard({
+  view,
+  onAfterTrade,
+  memberId = 'all',
+}: {
+  view: HoldingView;
+  onAfterTrade?: () => void;
+  /** Forwarded to the holding-detail modal so the buy/sell dialog
+   *  inherits the parent screen's member filter. */
+  memberId?: string | 'all';
+}) {
   const [open, setOpen] = useState(false);
   const { theme } = useTheme();
   const up = view.gain >= 0;
@@ -34,12 +44,7 @@ export function HoldingCard({ view, onAfterTrade }: { view: HoldingView; onAfter
       >
         <div className="flex justify-between items-start mb-4">
           <div className="flex items-center gap-3 min-w-0">
-            <div
-              className={`${card.iconBox} text-white`}
-              style={{ backgroundColor: color }}
-            >
-              <TrendingUp size={18} />
-            </div>
+            <AssetCategoryIcon asset={view.asset} color={color} size={40} />
             <div className="min-w-0">
               <div className="flex items-center gap-1.5">
                 <h4 className={`${card.title} line-clamp-2 leading-tight`}>{assetDisplayName(view.asset)}</h4>
@@ -94,6 +99,7 @@ export function HoldingCard({ view, onAfterTrade }: { view: HoldingView; onAfter
           onAfterTrade?.();
         }}
         view={view}
+        memberId={memberId}
       />
     </>
   );

@@ -1,11 +1,18 @@
 'use client';
 
-import { TrendingUp } from 'lucide-react';
+import { useState } from 'react';
+import { TrendingUp, ArrowUpDown } from 'lucide-react';
 import { HoldingCard } from '@/components/HoldingCard';
 import { EmptyState } from '@/components/EmptyState';
 import { useHoldingsView } from '@/hooks/useHoldingsView';
 import { useAggregateView } from '@/hooks/useAggregateView';
 import { aggregateBySymbol } from '@/lib/holdingsAggregate';
+import {
+  sortHoldingViews,
+  nextSortMode,
+  HOLDING_SORT_MODES,
+  type HoldingSortMode,
+} from '@/lib/holdingsSort';
 import { AccountSelector } from '@/features/dashboard/AccountSelector';
 import type { Account } from '@/lib/schema';
 
@@ -23,8 +30,11 @@ export function HoldingsList({
   const aggregate = useAggregateView();
   const { views, refresh, loaded } = useHoldingsView(memberId, accountId);
   const showAccountSelector = memberId !== 'all' && memberAccounts.length > 0;
+  const [sortMode, setSortMode] = useState<HoldingSortMode>('value');
 
-  const displayed = aggregate ? aggregateBySymbol(views) : views;
+  const collapsed = aggregate ? aggregateBySymbol(views) : views;
+  const displayed = sortHoldingViews(collapsed, sortMode);
+  const sortLabel = HOLDING_SORT_MODES.find((m) => m.mode === sortMode)?.label ?? '';
 
   return (
     <div className="px-2">
@@ -39,6 +49,17 @@ export function HoldingsList({
             />
           )}
         </div>
+        {displayed.length > 1 && (
+          <button
+            type="button"
+            onClick={() => setSortMode(nextSortMode(sortMode))}
+            className="shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-full bg-brand-surface text-brand-sage text-[11px] font-black active:bg-brand/10 transition-colors"
+            aria-label={`정렬: ${sortLabel}`}
+          >
+            <ArrowUpDown size={12} />
+            {sortLabel}
+          </button>
+        )}
       </div>
       {!loaded ? (
         // While the userId is still resolving (auth bootstrap), keep a
@@ -61,7 +82,12 @@ export function HoldingsList({
       ) : (
         <div className="grid gap-4">
           {displayed.map((v) => (
-            <HoldingCard key={`${v.holding.accountId}:${v.holding.id}`} view={v} onAfterTrade={refresh} />
+            <HoldingCard
+              key={`${v.holding.accountId}:${v.holding.id}`}
+              view={v}
+              onAfterTrade={refresh}
+              memberId={memberId}
+            />
           ))}
         </div>
       )}

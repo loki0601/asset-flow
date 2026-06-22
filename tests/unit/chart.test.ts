@@ -89,3 +89,45 @@ describe('generateSmoothAreaPath', () => {
     expect(path.trim().endsWith('Z')).toBe(true);
   });
 });
+
+describe('explicit range option (padding to avoid edge clipping)', () => {
+  // When caller supplies a padded {min, max}, the peak data point should
+  // land below the top edge (and the trough above the bottom edge),
+  // leaving headroom for the stroke and any smoothing overshoot.
+  it('generateLinePath: maps peak to padded y (not 0) when range expands beyond data', () => {
+    const path = generateLinePath([100, 200], 100, 100, { min: 50, max: 250 });
+    // data min (100) is 25% above true bottom → y = 100 - 25 = 75
+    expect(path).toContain('M0,75');
+    // data max (200) is 75% of padded range → y = 100 - 75 = 25
+    expect(path).toContain('L100,25');
+  });
+
+  it('generateSmoothLinePath: respects explicit range for 2 points', () => {
+    const path = generateSmoothLinePath([100, 200], 100, 100, { min: 50, max: 250 });
+    expect(path).toContain('M0,75');
+    expect(path).toContain('L100,25');
+  });
+
+  it('generateSmoothLinePath: respects explicit range for >=3 points', () => {
+    const path = generateSmoothLinePath([100, 200, 100], 100, 100, { min: 50, max: 250 });
+    // start at data-min y=75, peak (middle, data-max) at y=25, back to 75
+    expect(path).toContain('M0,75');
+    expect(path).toContain('50,25');
+    expect(path).toContain('100,75');
+  });
+
+  it('generateSmoothAreaPath: respects explicit range', () => {
+    const path = generateSmoothAreaPath([100, 200, 100], 100, 100, { min: 50, max: 250 });
+    expect(path).toContain('50,25');
+    expect(path).toContain('L100,100'); // baseline still at viewBox bottom
+    expect(path).toContain('L0,100');
+  });
+
+  it('generateAreaPath: respects explicit range', () => {
+    const path = generateAreaPath([100, 200], 100, 100, { min: 50, max: 250 });
+    expect(path).toContain('M0,75');
+    expect(path).toContain('L100,25');
+    expect(path).toContain('L100,100');
+    expect(path).toContain('L0,100');
+  });
+});
