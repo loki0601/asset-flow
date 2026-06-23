@@ -198,6 +198,17 @@ def fetch_us_tracked(prices: dict[str, dict]) -> None:
     print(f"  US tracked: {appended}/{len(tickers)} symbols", file=sys.stderr)
 
 
+def merge_us_prices(prices: dict[str, dict], us_prices: dict[str, dict]) -> dict[str, dict]:
+    """Return a new prices map with `us_prices` overlaid on `prices`.
+
+    US (NASDAQ:/NYSE:) entries are replaced/added from the fresh post-close
+    fetch; every other entry (KRX, crypto, …) is carried over untouched.
+    Pure — neither input is mutated."""
+    merged = dict(prices)
+    merged.update(us_prices)
+    return merged
+
+
 def fetch_crypto(prices: dict[str, dict]) -> None:
     req = urllib.request.Request(COINGECKO_URL, headers={"Accept": "application/json"})
     with urllib.request.urlopen(req, timeout=30) as resp:
@@ -301,6 +312,62 @@ def append_today_to_history_for_tracked() -> None:
         con.close()
 
 
+def append_us_history(us_prices: dict[str, dict]) -> None:
+    """Append today's (KST) close for the freshly-fetched US symbols only.
+    The post-US-close refresh must NOT touch KRX/crypto history — those are
+    owned by the 15:35 batch and tagging yesterday's KRX close under today's
+    date would corrupt the series."""
+    if not SERVER_DB.exists() or not us_prices:
+        return
+    con = sqlite3.connect(str(SERVER_DB))
+    try:
+        con.execute("PRAGMA journal_mode=WAL")
+        con.execute(
+            """CREATE TABLE IF NOT EXISTS tracked_symbols (
+                 symbol TEXT PRIMARY KEY,
+                 first_added_at TEXT NOT NULL,
+                 last_close_date TEXT,
+                 source TEXT,
+                 status TEXT NOT NULL DEFAULT 'pending'
+               )"""
+        )
+        con.execute(
+            """CREATE TABLE IF NOT EXISTS price_history (
+                 symbol TEXT NOT NULL,
+                 date TEXT NOT NULL,
+                 close REAL NOT NULL,
+                 PRIMARY KEY (symbol, date)
+               )"""
+        )
+        ready = {
+            r[0]
+            for r in con.execute(
+                "SELECT symbol FROM tracked_symbols WHERE status='ready'"
+            ).fetchall()
+        }
+        today_kst = datetime.now(KST).date().isoformat()
+        appended = 0
+        for symbol, p in us_prices.items():
+            if symbol not in ready:
+                continue
+            close = float(p.get("price") or 0)
+            if close <= 0:
+                continue
+            con.execute(
+                "INSERT OR IGNORE INTO price_history (symbol, date, close) VALUES (?, ?, ?)",
+                (symbol, today_kst, close),
+            )
+            con.execute(
+                "UPDATE tracked_symbols SET last_close_date=? WHERE symbol=?",
+                (today_kst, symbol),
+            )
+            appended += 1
+        con.commit()
+        print(f"  US refresh: appended close to {appended} symbols", file=sys.stderr)
+    finally:
+        con.close()
+
+
 def load_env_local(path: Path) -> dict[str, str]:
     """Tiny .env reader — supports KEY=VALUE per line, no quoting subtleties."""
     out: dict[str, str] = {}
@@ -383,5 +450,35 @@ def main() -> int:
     return 0
 
 
+def run_us_only() -> int:
+    """Post-US-close refresh (~05:40 KST). The 15:35 batch runs before the
+    US session for that KST day opens (US opens 22:30 KST), so US symbols
+    always lag a full session until next day's batch. This re-fetches only
+    US closes and merges them into the existing prices.json, leaving KRX /
+    crypto / fx untouched. No FCM push — it would ping users at dawn; the
+    morning app-open sync picks the fresh prices.json up on its own."""
+    print("Refreshing US closes (post-market)…", file=sys.stderr)
+    if not OUT_PATH.exists():
+        print("  prices.json missing — running full fetch instead", file=sys.stderr)
+        return main()
+    payload = json.loads(OUT_PATH.read_text())
+    base_prices = payload.get("prices", {})
+    us_prices: dict[str, dict] = {}
+    fetch_us_tracked(us_prices)
+    if not us_prices:
+        print("  no US prices fetched; leaving prices.json unchanged", file=sys.stderr)
+        return 0
+    merged = merge_us_prices(base_prices, us_prices)
+    payload["prices"] = merged
+    payload["count"] = len(merged)
+    payload["as_of"] = datetime.now(KST).isoformat(timespec="seconds")
+    OUT_PATH.write_text(json.dumps(payload, ensure_ascii=False, indent=2))
+    print(f"  updated {len(us_prices)} US prices → {OUT_PATH}", file=sys.stderr)
+    append_us_history(us_prices)
+    return 0
+
+
 if __name__ == "__main__":
+    if "--us-only" in sys.argv[1:]:
+        sys.exit(run_us_only())
     sys.exit(main())

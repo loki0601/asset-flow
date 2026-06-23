@@ -4,6 +4,7 @@
 #
 # Currently registers:
 #   - com.assetflow.fetch-prices              (15:35 KST, price snapshot)
+#   - com.assetflow.fetch-prices-us           (05:40 KST, post-US-close refresh)
 #   - com.assetflow.fetch-reference-events    (06:00 KST, IPO/lockup calendar)
 set -euo pipefail
 
@@ -32,6 +33,7 @@ install_one() {
 
 install_one com.assetflow.web
 install_one com.assetflow.fetch-prices
+install_one com.assetflow.fetch-prices-us
 install_one com.assetflow.fetch-reference-events
 install_one com.assetflow.push-today-insights
 
@@ -39,5 +41,6 @@ echo
 echo "verify : launchctl list | grep com.assetflow"
 echo "logs   : $PROJECT_DIR/data/web-server.log"
 echo "         $PROJECT_DIR/data/fetch-prices.log"
+echo "         $PROJECT_DIR/data/fetch-prices-us.log"
 echo "         $PROJECT_DIR/data/fetch-reference-events.log"
 echo "         $PROJECT_DIR/data/push-today-insights.log"
