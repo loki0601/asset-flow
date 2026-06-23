@@ -63,5 +63,21 @@ class MergeUsPricesTest(unittest.TestCase):
         self.assertEqual(existing["NASDAQ:GOOGL"]["price"], 368.03)
 
 
+class BuildFcmPayloadTest(unittest.TestCase):
+    def test_visible_push_includes_title_and_body(self):
+        payload = fp.build_fcm_payload("syncPrices", "AssetFlow", "장마감 시세가 업데이트됐어요")
+        self.assertEqual(payload["action"], "syncPrices")
+        self.assertEqual(payload["title"], "AssetFlow")
+        self.assertEqual(payload["body"], "장마감 시세가 업데이트됐어요")
+
+    def test_silent_push_omits_title_and_body(self):
+        # The post-US-close refresh runs at dawn — it must trigger a background
+        # sync WITHOUT showing a notification, so no title/body keys.
+        payload = fp.build_fcm_payload("syncPrices", None, None)
+        self.assertEqual(payload, {"action": "syncPrices"})
+        self.assertNotIn("title", payload)
+        self.assertNotIn("body", payload)
+
+
 if __name__ == "__main__":
     unittest.main()

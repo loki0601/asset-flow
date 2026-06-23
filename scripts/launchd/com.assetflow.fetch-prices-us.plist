@@ -11,8 +11,8 @@
   What it does:
     Runs `fetch-prices.py --us-only` — re-fetches only NASDAQ/NYSE closes
     and merges them into the existing prices.json, leaving KRX / crypto / fx
-    untouched. No FCM push (would ping at dawn); the morning app-open sync
-    picks up the refreshed prices.json on its own.
+    untouched. Sends a silent (data-only) FCM push so devices background-
+    refresh without showing a dawn notification.
 
   Why 05:40 and not 05:00?
     US regular session closes 16:00 ET = 05:00 KST. Yahoo needs a few minutes

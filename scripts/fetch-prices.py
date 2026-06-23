@@ -382,30 +382,41 @@ def load_env_local(path: Path) -> dict[str, str]:
     return out
 
 
-def notify_devices_via_fcm() -> None:
+def build_fcm_payload(action: str, title: str | None, body: str | None) -> dict:
+    """Build the JSON body for /api/fcm/send. When title/body are both None
+    the push is data-only (silent) — the client still runs its syncPrices
+    handler but no notification is shown. Used by the dawn US-close refresh
+    so it can update prices in the background without pinging the user."""
+    payload: dict = {"action": action}
+    if title is not None:
+        payload["title"] = title
+    if body is not None:
+        payload["body"] = body
+    return payload
+
+
+def notify_devices_via_fcm(
+    title: str | None = "AssetFlow",
+    body: str | None = "장마감 시세가 업데이트됐어요",
+) -> None:
     """POST /api/fcm/send with action=syncPrices so every registered device
-    auto-runs the price sync after the bulk fetch finishes. Best-effort: any
-    failure (server down, secret missing, no tokens) is logged and skipped."""
+    auto-runs the price sync after the bulk fetch finishes. Pass title=body=None
+    for a silent (data-only) push. Best-effort: any failure (server down,
+    secret missing, no tokens) is logged and skipped."""
     project_root = Path(__file__).resolve().parents[1]
     env = load_env_local(project_root / ".env.local")
     secret = env.get("FCM_SEND_SECRET") or os.environ.get("FCM_SEND_SECRET")
     if not secret:
         print("[fcm] FCM_SEND_SECRET missing; skipping push", file=sys.stderr)
         return
-    body = json.dumps(
-        {
-            "action": "syncPrices",
-            "title": "AssetFlow",
-            "body": "장마감 시세가 업데이트됐어요",
-        }
-    ).encode()
+    body_bytes = json.dumps(build_fcm_payload("syncPrices", title, body)).encode()
     # Hit the local prod server directly so Cloudflare's WAF doesn't flag
     # the python User-Agent. Override via FCM_SEND_URL in .env.local if the
     # box runs the Next.js server on a different port.
     url = env.get("FCM_SEND_URL", "http://127.0.0.1:3500/api/fcm/send")
     req = urllib.request.Request(
         url,
-        data=body,
+        data=body_bytes,
         headers={
             "Content-Type": "application/json",
             "Authorization": f"Bearer {secret}",
@@ -455,8 +466,8 @@ def run_us_only() -> int:
     US session for that KST day opens (US opens 22:30 KST), so US symbols
     always lag a full session until next day's batch. This re-fetches only
     US closes and merges them into the existing prices.json, leaving KRX /
-    crypto / fx untouched. No FCM push — it would ping users at dawn; the
-    morning app-open sync picks the fresh prices.json up on its own."""
+    crypto / fx untouched. Sends a *silent* (data-only) FCM push so devices
+    background-refresh without a dawn notification."""
     print("Refreshing US closes (post-market)…", file=sys.stderr)
     if not OUT_PATH.exists():
         print("  prices.json missing — running full fetch instead", file=sys.stderr)
@@ -475,6 +486,8 @@ def run_us_only() -> int:
     OUT_PATH.write_text(json.dumps(payload, ensure_ascii=False, indent=2))
     print(f"  updated {len(us_prices)} US prices → {OUT_PATH}", file=sys.stderr)
     append_us_history(us_prices)
+    # Silent push (no title/body) — refresh in the background, no dawn ping.
+    notify_devices_via_fcm(title=None, body=None)
     return 0
 
 
