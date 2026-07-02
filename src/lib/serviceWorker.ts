@@ -5,39 +5,46 @@
  * AuthProvider mount. We don't await registration; the SW progress lives in
  * its own lifecycle and doesn't block app boot.
  *
- * When a new SW version is detected we postMessage('skipWaiting') and bump
- * a counter in sessionStorage. After two cycles we trigger a soft reload so
- * the new HTML chunk graph is picked up — without this the user can sit on
- * the previous deploy's bundle for the whole session.
+ * Why the explicit reg.update(): browsers only auto-check for a new sw.js on
+ * navigation and at most every ~24h. Capacitor's live-mode WebView doesn't
+ * navigate in a way that triggers that check, so without a manual update()
+ * call a shipped sw.js change can sit unapplied for days — the symptom was a
+ * headline price frozen for over a week while the chart (a different URL that
+ * dodged the stale cache) kept refreshing. We force the check every boot,
+ * promote any worker already parked in `waiting`, and reload exactly once when
+ * the controller flips so the page is actually driven by the new SW.
  */
 export function registerServiceWorker(): void {
   if (typeof window === 'undefined') return;
   if (!('serviceWorker' in navigator)) return;
-  // Avoid double-registering on react strict-mode double-mounts.
-  if (navigator.serviceWorker.controller && (window as unknown as { __sw_registered?: boolean }).__sw_registered) {
-    return;
-  }
-  (window as unknown as { __sw_registered?: boolean }).__sw_registered = true;
+
+  // Reload once when a new SW takes control, so the page runs under the fresh
+  // worker (and its fresh caching strategies) instead of the one that booted
+  // us. Guarded against reload loops: after the reload the new SW is already
+  // the controller, so no further controllerchange fires.
+  let reloading = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (reloading) return;
+    reloading = true;
+    location.reload();
+  });
 
   navigator.serviceWorker
     .register('/sw.js', { scope: '/' })
     .then((reg) => {
-      // Surface updates: when a new SW takes over after we already have
-      // controlled chunks, force a soft reload so the new HTML chunk graph
-      // is fetched. Throttled via session flag to avoid reload loops.
+      // Force an update check on every boot (see header comment).
+      reg.update().catch(() => {});
+      // A worker installed on a previous boot but never activated — promote it.
+      if (reg.waiting) reg.waiting.postMessage('skipWaiting');
+
       reg.addEventListener('updatefound', () => {
         const nw = reg.installing;
         if (!nw) return;
         nw.addEventListener('statechange', () => {
-          if (nw.state === 'installed' && navigator.serviceWorker.controller) {
+          // As soon as the new worker is installed, tell it to skip waiting.
+          // controllerchange (above) then reloads the page under the new SW.
+          if (nw.state === 'installed') {
             nw.postMessage('skipWaiting');
-            const k = '__assetflow_sw_reload_at';
-            const last = Number(sessionStorage.getItem(k) || '0');
-            if (Date.now() - last > 30_000) {
-              sessionStorage.setItem(k, String(Date.now()));
-              // Soft reload — chunks come from the new SW cache.
-              setTimeout(() => location.reload(), 500);
-            }
           }
         });
       });
