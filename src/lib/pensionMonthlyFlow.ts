@@ -22,6 +22,7 @@ import {
 } from '@/lib/retirementPlanning';
 import {
   computePortfolioFlow,
+  syntheticBuyAnchor,
   type FxLookup,
   type PortfolioTx,
   type SymbolMeta,
@@ -162,8 +163,8 @@ function dailyAccountValue(args: {
 
 /**
  * Mirror of the buildTxs helper inside usePortfolioFlow — kept in sync
- * because both paths need the same "synthetic buy at first-history date"
- * rule for holdings that lack an explicit transaction trail.
+ * because both paths need the same synthetic-buy anchoring rule
+ * (syntheticBuyAnchor) for holdings that lack an explicit transaction trail.
  */
 function buildPortfolioTxs(
   txs: Transaction[],
@@ -187,11 +188,11 @@ function buildPortfolioTxs(
   for (const h of holdings) {
     if (seen.has(`${h.accountId}:${h.symbol}`)) continue;
     const hist = histories.get(h.symbol);
-    const anchor =
-      hist?.[0]?.date ??
-      (h.createdAt
-        ? h.createdAt.slice(0, 10)
-        : new Date().toISOString().slice(0, 10));
+    const anchor = syntheticBuyAnchor(
+      h.createdAt,
+      hist?.[0]?.date,
+      new Date().toISOString().slice(0, 10),
+    );
     synthetic.push({
       symbol: h.symbol,
       type: 'buy',

@@ -8,6 +8,10 @@ import type { HoldingView } from '@/hooks/useHoldingsView';
  * Quantity sums; avgPrice is volume-weighted; totalValue / costBasis /
  * dailyChange sum; gainPct re-derived. Keeps the first view's holding ID +
  * accountId so React keys stay stable across renders.
+ *
+ * Rows built from 2+ views carry `constituents` — the original per-account
+ * views — so the detail modal can offer per-account buy/sell instead of
+ * silently trading against the first account (the old behavior).
  */
 export function aggregateBySymbol(views: HoldingView[]): HoldingView[] {
   const map = new Map<string, HoldingView>();
@@ -40,6 +44,9 @@ export function aggregateBySymbol(views: HoldingView[]): HoldingView[] {
       costBasis,
       gain,
       gainPct,
+      // First merge: seed with the two originals. Later merges extend.
+      // `existing` may itself be an untouched single view (no constituents).
+      constituents: [...(existing.constituents ?? [existing]), v],
     });
   }
   return Array.from(map.values());

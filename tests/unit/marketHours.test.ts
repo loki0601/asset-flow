@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { liveDateFor, isLiveWindow, classifyMarket } from '@/lib/marketHours';
+import { anyLiveWindow, liveDateFor, isLiveWindow, classifyMarket } from '@/lib/marketHours';
 
 /**
  * Test inputs use ISO timestamps; the helpers interpret them in Asia/Seoul
@@ -91,5 +91,31 @@ describe('liveDateFor', () => {
     expect(liveDateFor('KRX:005930', new Date('2026-05-17T01:00:00Z'))).toBeNull();
     // Saturday 23:00 KST — US closed (weekend)
     expect(liveDateFor('NASDAQ:AAPL', new Date('2026-05-23T14:00:00Z'))).toBeNull();
+  });
+});
+
+describe('anyLiveWindow', () => {
+  // Powers the in-session live polling loop: poll only while at least one
+  // held symbol's market is actually open, so the app doesn't hit
+  // /api/prices/live every minute at 3am for a KRX-only portfolio.
+  it('true when at least one symbol is in its live window', () => {
+    // Mon 10:00 KST — KRX open, US closed
+    const now = new Date('2026-05-18T01:00:00Z');
+    expect(anyLiveWindow(['NASDAQ:AAPL', 'KRX:005930'], now)).toBe(true);
+  });
+
+  it('false when every market is closed', () => {
+    // Mon 20:00 KST — KRX closed, US not yet open
+    const now = new Date('2026-05-18T11:00:00Z');
+    expect(anyLiveWindow(['NASDAQ:AAPL', 'KRX:005930'], now)).toBe(false);
+  });
+
+  it('crypto keeps the window open 24/7', () => {
+    const now = new Date('2026-05-18T11:00:00Z');
+    expect(anyLiveWindow(['CRYPTO:BTC'], now)).toBe(true);
+  });
+
+  it('false for an empty symbol list', () => {
+    expect(anyLiveWindow([], new Date('2026-05-18T01:00:00Z'))).toBe(false);
   });
 });

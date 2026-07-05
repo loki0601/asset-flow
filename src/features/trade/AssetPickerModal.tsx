@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { X, Search, ChevronRight, CreditCard } from 'lucide-react';
 import { ACCOUNT_TYPES, type AssetCategory, type MarketAsset } from '@/lib/schema';
@@ -10,7 +10,7 @@ import { institutionSupports, listInstitutionsByKind } from '@/lib/institutions'
 import { formatPrice } from '@/lib/loans';
 import { assetDisplayName } from '@/lib/assetDisplay';
 import { categoryColor } from '@/lib/categoryColors';
-import { isAllInitials, matchesInitials } from '@/lib/hangulInitials';
+import { searchAssets } from '@/lib/assetSearch';
 import { Modal } from '@/components/Modal';
 import { AssetCategoryIcon } from '@/components/AssetCategoryIcon';
 import { TradeForm } from '@/features/trade/TradeForm';
@@ -68,71 +68,19 @@ export function AssetPickerModal({ open, onClose, onTraded }: Props) {
     return new Set(holdingsRepo.list(userId).map((h) => h.symbol));
   }, [userId, open]);
 
+  // useDeferredValue keeps keystrokes responsive: the input paints
+  // immediately and the 13k-symbol scan below runs on the deferred value in
+  // a lower-priority render instead of blocking every keypress.
+  const deferredQuery = useDeferredValue(query);
+
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    const base = listMarketAssets().filter((a) => {
-      if (a.deprecated) return false; // 단종 종목은 신규 매수 목록에서 숨김
-      if (category !== '전체' && a.category !== category) return false;
-      return true;
-    });
-    // Hoist held assets to the top of every result list — they're the ones
-    // the user typically wants to add to / trim from.  Preserves the
-    // alphabetical ordering inside each group (held vs. unheld).
-    const heldFirst = (list: typeof base) => {
-      const held: typeof base = [];
-      const rest: typeof base = [];
-      for (const a of list) {
-        (heldSymbols.has(a.symbol) ? held : rest).push(a);
-      }
-      return [...held, ...rest];
-    };
-    if (!q) return heldFirst(base);
-
-    // If the user typed only Hangul initial jamo (e.g. "ㅅㅅ"), match against
-    // the initials-projection of name/nameKo. Falls through to substring
-    // search for any other query shape.
-    const initialsOnly = isAllInitials(query.trim());
-
-    // Symbol (e.g. ARKX) is what users actually search for — prioritise it.
-    // Score: 0=exact symbol/name, 1=symbol prefix, 2=symbol contains, 3=name
-    // prefix, 4=name contains, 5=initial-jamo match. Anything else drops out.
-    type Scored = { a: (typeof base)[number]; score: number };
-    const scored: Scored[] = [];
-    for (const a of base) {
-      const sym = a.symbol.split(':').pop()?.toLowerCase() ?? '';
-      // Match against both English and Korean names so "애플" and "Apple"
-      // both surface the same ticker. Lowercase normalisation works for
-      // hangul too — toLowerCase is a no-op for non-cased scripts.
-      const name = a.name.toLowerCase();
-      const nameKo = (a.nameKo ?? '').toLowerCase();
-      let score = -1;
-      if (sym === q || name === q || nameKo === q) score = 0;
-      else if (sym.startsWith(q)) score = 1;
-      else if (sym.includes(q)) score = 2;
-      else if (name.startsWith(q) || nameKo.startsWith(q)) score = 3;
-      else if (name.includes(q) || nameKo.includes(q)) score = 4;
-      else if (
-        initialsOnly &&
-        (matchesInitials(a.name, query.trim()) ||
-          matchesInitials(a.nameKo ?? '', query.trim()))
-      ) {
-        score = 5;
-      }
-      if (score >= 0) scored.push({ a, score });
-    }
-    // Held items take precedence over scoring — a held position is always
-    // more interesting than an unrelated match at the same relevance band.
-    scored.sort((x, y) => {
-      const xh = heldSymbols.has(x.a.symbol) ? 0 : 1;
-      const yh = heldSymbols.has(y.a.symbol) ? 0 : 1;
-      if (xh !== yh) return xh - yh;
-      return x.score - y.score || x.a.name.localeCompare(y.a.name);
-    });
-    return scored.map((s) => s.a);
+    // searchAssets caps the result list (PICKER_RESULT_LIMIT) — rendering
+    // every match used to mount the entire catalog as DOM rows.
+    return searchAssets(listMarketAssets(), deferredQuery, category, heldSymbols);
     // `marketKey` triggers a re-read after a catalog OR price sync; `open`
     // is included so re-opening the modal also refreshes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query, category, open, marketKey, heldSymbols]);
+  }, [deferredQuery, category, open, marketKey, heldSymbols]);
 
   function handleClose() {
     setSelected(null);

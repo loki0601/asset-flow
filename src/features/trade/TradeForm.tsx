@@ -15,6 +15,7 @@ import { institutionSupports } from '@/lib/institutions';
 import { formatPrice, type PriceCurrency } from '@/lib/loans';
 import { valuationAmount, validateTradeInput } from '@/lib/holdings';
 import { applyBuy, applySell, formatPriceInput, preferredAccountId } from '@/lib/trade';
+import { accountOwnerLabel } from '@/lib/accountLabel';
 import { trackSymbolHistory } from '@/lib/prices';
 import { useCurrentUserId } from '@/components/AuthProvider';
 
@@ -41,9 +42,26 @@ interface Props {
    *  one member's holdings, the buy/sell dialog only offers that
    *  member's accounts. */
   memberId?: string | 'all';
+  /** Pre-select this account (e.g. the account of the card the user
+   *  tapped). Falls back to preferredAccountId when absent/invalid. */
+  initialAccountId?: string;
+  /** Render the account as a fixed read-only line instead of a dropdown.
+   *  Used when the trade targets a SPECIFIC position (sell from a card,
+   *  per-account row in the aggregate detail) — prevents the order from
+   *  silently landing in a different account. Ignored unless
+   *  initialAccountId resolves to a valid candidate account. */
+  lockAccount?: boolean;
 }
 
-export function TradeForm({ asset, side, onBack, onClose, memberId = 'all' }: Props) {
+export function TradeForm({
+  asset,
+  side,
+  onBack,
+  onClose,
+  memberId = 'all',
+  initialAccountId,
+  lockAccount = false,
+}: Props) {
   const userId = useCurrentUserId();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [members, setMembers] = useState<FamilyMember[]>([]);
@@ -62,19 +80,21 @@ export function TradeForm({ asset, side, onBack, onClose, memberId = 'all' }: Pr
       .filter((a) => memberId === 'all' || a.memberId === memberId);
     setAccounts(accs);
     setMembers(familyRepo.list(userId));
-    // Prefer an account that already holds this symbol so the dialog
-    // defaults to where the position lives. With multiple held accounts
-    // the first in dropdown order wins; with none, fall back to the
-    // first candidate.
-    const preferred = preferredAccountId(
-      accs,
-      holdingsRepo.list(userId),
-      asset.symbol,
-    );
+    // A caller-supplied account (the card/row the user tapped) wins over
+    // the heuristic default; otherwise prefer an account that already
+    // holds this symbol so the dialog defaults to where the position
+    // lives. With multiple held accounts the first in dropdown order
+    // wins; with none, fall back to the first candidate.
+    const initialValid =
+      initialAccountId && accs.some((a) => a.id === initialAccountId)
+        ? initialAccountId
+        : null;
+    const preferred =
+      initialValid ?? preferredAccountId(accs, holdingsRepo.list(userId), asset.symbol);
     setAccountId((prev) => prev ?? preferred);
     // Reset date to today each time the form is mounted (e.g. new picker open)
     setDateStr(todayISODate());
-  }, [userId, asset.category, asset.symbol, memberId]);
+  }, [userId, asset.category, asset.symbol, memberId, initialAccountId]);
 
   // priceStr stays user-controlled; the current price is shown via placeholder
   // only, not pre-filled, so the user explicitly enters their fill price.
@@ -82,6 +102,17 @@ export function TradeForm({ asset, side, onBack, onClose, memberId = 'all' }: Pr
   const membersById = useMemo(
     () => Object.fromEntries(members.map((m) => [m.id, m] as const)),
     [members],
+  );
+
+  // Resolved account for the locked (read-only) display. Null when the
+  // caller-supplied account isn't a valid candidate — the dropdown then
+  // renders as usual so the user can still pick.
+  const lockedAccount = useMemo(
+    () =>
+      lockAccount && initialAccountId
+        ? accounts.find((a) => a.id === initialAccountId) ?? null
+        : null,
+    [lockAccount, initialAccountId, accounts],
   );
 
   const price = Number(priceStr.replaceAll(',', ''));
@@ -236,6 +267,12 @@ export function TradeForm({ asset, side, onBack, onClose, memberId = 'all' }: Pr
             <p className="text-xs font-bold text-rose-500 px-1">
               이 카테고리를 보유할 수 있는 계좌가 없어요. 설정에서 추가하세요.
             </p>
+          ) : lockAccount && lockedAccount ? (
+            // Trade targets a specific position — show the account as a
+            // fixed line so the order can't silently land elsewhere.
+            <div className="w-full bg-brand-surface px-4 py-3 rounded-2xl text-sm font-bold text-brand-ink truncate">
+              {accountOwnerLabel(lockedAccount, members.find((m) => m.id === lockedAccount.memberId))}
+            </div>
           ) : (
             <div className="relative">
               <select

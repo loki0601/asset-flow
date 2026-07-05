@@ -22,6 +22,10 @@ export interface HoldingView {
   /** gain / costBasis × 100. 0 when costBasis is 0. */
   gainPct: number;
   category: AssetCategory;
+  /** Present only on rows built by aggregateBySymbol from 2+ accounts:
+   *  the original per-account views, so the detail modal can target a
+   *  specific account for buy/sell. */
+  constituents?: HoldingView[];
 }
 
 /**

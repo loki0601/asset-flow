@@ -55,6 +55,22 @@ function subtractDays(date: string, days: number): string {
   return d.toISOString().slice(0, 10);
 }
 
+/**
+ * Anchor date for the synthetic buy generated for a holding that has no
+ * transaction trail. The holding's createdAt is the honest choice — the
+ * first-history-date anchor used before fabricated years of phantom
+ * history (and phantom gains) for positions actually added recently.
+ * History-date fallback only applies to legacy rows missing createdAt.
+ */
+export function syntheticBuyAnchor(
+  createdAt: string | undefined,
+  firstHistoryDate: string | undefined,
+  today: string,
+): string {
+  if (createdAt) return createdAt.slice(0, 10);
+  return firstHistoryDate ?? today;
+}
+
 export function computePortfolioFlow(
   txs: PortfolioTx[],
   histories: Map<string, PriceHistoryRow[]>,
@@ -97,8 +113,15 @@ export function computePortfolioFlow(
   }
 
   // FX cursor — like price cursor, advances monotonically through dates.
+  // Dates BEFORE the first fx row backward-fill from that first row: the
+  // earliest known historical rate is a far better estimate for old dates
+  // than today's fallback (which used to overstate 2016-era USD values by
+  // whatever the rate has drifted since).
   const fxLookup = options?.fxUsdKrw;
-  const fxCursor = { idx: -1, lastRate: fxLookup?.fallback ?? 1 };
+  const fxCursor = {
+    idx: -1,
+    lastRate: fxLookup?.rates[0]?.rate ?? fxLookup?.fallback ?? 1,
+  };
 
   // Running per-symbol quantity from applied transactions.
   const qty = new Map<string, number>();

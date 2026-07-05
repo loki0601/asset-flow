@@ -14,7 +14,7 @@ import {
   realizedPnl,
   type TradePeriod,
 } from '@/lib/transactionHistory';
-import { assetDisplayName } from '@/lib/assetDisplay';
+import { assetDisplayName, fallbackAsset } from '@/lib/assetDisplay';
 import { categoryColor } from '@/lib/categoryColors';
 import { formatPrice } from '@/lib/loans';
 import { AssetCategoryIcon } from '@/components/AssetCategoryIcon';
@@ -46,16 +46,11 @@ function shortMD(date: string): string {
 }
 
 /** A held/traded symbol should resolve in the catalog; fall back to a minimal
- *  asset so deprecated/unknown tickers still render an icon + name. */
+ *  asset so deprecated/unknown tickers still render an icon + name.
+ *  fallbackAsset infers the currency from the exchange prefix — a hardcoded
+ *  KRW fallback used to render a delisted US stock's $415.65 sale as ₩416. */
 function assetFor(symbol: string): Pick<MarketAsset, 'symbol' | 'category' | 'name' | 'nameKo' | 'currency'> {
-  return (
-    getMarketAsset(symbol) ?? {
-      symbol,
-      category: '국내증권',
-      name: symbol,
-      currency: 'KRW',
-    }
-  );
+  return getMarketAsset(symbol) ?? fallbackAsset(symbol);
 }
 
 export default function TransactionsPage() {

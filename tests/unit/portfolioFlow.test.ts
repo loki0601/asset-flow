@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computePortfolioFlow, type PortfolioTx } from '@/lib/portfolioFlow';
+import { computePortfolioFlow, syntheticBuyAnchor, type PortfolioTx } from '@/lib/portfolioFlow';
 import type { PriceHistoryRow } from '@/lib/priceHistoryRepo';
 
 describe('computePortfolioFlow with a fixed (current) FX', () => {
@@ -224,5 +224,66 @@ describe('computePortfolioFlow', () => {
     ]);
     const flow = computePortfolioFlow([tx('KRX:A', 'buy', 5, '2026-05-10')], histories);
     expect(flow).toEqual([{ date: '2026-05-10', close: 500 }]);
+  });
+});
+
+describe('FX before the first fx_history row (backward-fill)', () => {
+  // Regression: the fx cursor used to start at `fallback` (today's rate), so
+  // every plotted date EARLIER than the first fx_history row valued USD
+  // holdings at today's FX — overstating a 2016-2022 backcast by 15-25%
+  // whenever fx_history only reached back a few years. The earliest KNOWN
+  // historical rate is a far better estimate for those dates.
+  it('uses the first known rate, not the fallback, for dates before fx coverage', () => {
+    const txs: PortfolioTx[] = [{ symbol: 'NASDAQ:AAPL', type: 'buy', quantity: 1, date: '2020-01-02' }];
+    const histories = new Map<string, PriceHistoryRow[]>([
+      ['NASDAQ:AAPL', [
+        { date: '2020-01-02', close: 100 },
+        { date: '2023-01-02', close: 100 },
+      ]],
+    ]);
+    const out = computePortfolioFlow(txs, histories, {
+      symbolMeta: new Map([['NASDAQ:AAPL', { currency: 'USD' as const }]]),
+      fxUsdKrw: {
+        rates: [{ date: '2023-01-02', rate: 1200 }], // coverage starts 2023
+        fallback: 1400, // today's rate
+      },
+    });
+    const at2020 = out.find((r) => r.date === '2020-01-02')!;
+    const at2023 = out.find((r) => r.date === '2023-01-02')!;
+    expect(at2020.close).toBe(100 * 1200); // backward-filled first known rate
+    expect(at2023.close).toBe(100 * 1200);
+  });
+
+  it('still uses the fallback when there are no fx rows at all', () => {
+    const txs: PortfolioTx[] = [{ symbol: 'NASDAQ:AAPL', type: 'buy', quantity: 1, date: '2020-01-02' }];
+    const histories = new Map<string, PriceHistoryRow[]>([
+      ['NASDAQ:AAPL', [{ date: '2020-01-02', close: 100 }]],
+    ]);
+    const out = computePortfolioFlow(txs, histories, {
+      symbolMeta: new Map([['NASDAQ:AAPL', { currency: 'USD' as const }]]),
+      fxUsdKrw: { rates: [], fallback: 1400 },
+    });
+    expect(out.find((r) => r.date === '2020-01-02')!.close).toBe(100 * 1400);
+  });
+});
+
+describe('syntheticBuyAnchor', () => {
+  // Regression: holdings WITHOUT a transaction trail used to anchor their
+  // synthetic buy at the earliest price-history row (e.g. 2016), fabricating
+  // a decade of phantom history for a position actually added last month.
+  // The holding's createdAt is the honest anchor.
+  it('prefers the holding createdAt over the first history date', () => {
+    expect(
+      syntheticBuyAnchor('2026-06-10T09:00:00+09:00', '2016-01-04', '2026-07-05'),
+    ).toBe('2026-06-10');
+  });
+
+  it('falls back to the first history date when createdAt is missing', () => {
+    expect(syntheticBuyAnchor(undefined, '2016-01-04', '2026-07-05')).toBe('2016-01-04');
+    expect(syntheticBuyAnchor('', '2016-01-04', '2026-07-05')).toBe('2016-01-04');
+  });
+
+  it('falls back to today when neither exists', () => {
+    expect(syntheticBuyAnchor(undefined, undefined, '2026-07-05')).toBe('2026-07-05');
   });
 });

@@ -1,14 +1,18 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { HoldingView } from '@/hooks/useHoldingsView';
 import { AssetCategoryIcon } from '@/components/AssetCategoryIcon';
 import { HoldingDetailModal } from '@/features/holdings/HoldingDetailModal';
 import { card } from '@/lib/cardStyles';
 import { formatKRW } from '@/lib/loans';
 import { assetDisplayName } from '@/lib/assetDisplay';
+import { accountOwnerLabel } from '@/lib/accountLabel';
 import { categoryColor } from '@/lib/categoryColors';
 import { useTheme } from '@/hooks/useTheme';
+import { useCurrentUserId } from '@/components/AuthProvider';
+import { familyRepo } from '@/lib/repos';
+import { useHoldingsData } from '@/components/HoldingsDataProvider';
 
 export function HoldingCard({
   view,
@@ -23,9 +27,20 @@ export function HoldingCard({
 }) {
   const [open, setOpen] = useState(false);
   const { theme } = useTheme();
+  const userId = useCurrentUserId();
+  const { accounts } = useHoldingsData();
   const up = view.gain >= 0;
   const color = categoryColor(view.category, theme);
   const qtyLabel = formatQty(view.holding.quantity, view.category);
+  // Owner/account line: which position this card actually is. Aggregated
+  // (모아보기) cards span several accounts, so they show the count instead.
+  const ownerLabel = useMemo(() => {
+    if (view.constituents) return `${view.constituents.length}개 계좌`;
+    const acc = accounts.find((a) => a.id === view.holding.accountId);
+    const member =
+      acc && userId ? familyRepo.list(userId).find((m) => m.id === acc.memberId) : undefined;
+    return accountOwnerLabel(acc, member);
+  }, [view.constituents, view.holding.accountId, accounts, userId]);
   // USD assets carry a secondary native-currency pill alongside the KRW
   // primary values, so users can cross-check against US brokerage statements.
   const isUsd = view.asset.currency === 'USD';
@@ -54,7 +69,9 @@ export function HoldingCard({
                   </span>
                 )}
               </div>
-              <p className={card.subLabel}>{qtyLabel}</p>
+              <p className={`${card.subLabel} truncate`}>
+                {qtyLabel} · {ownerLabel}
+              </p>
             </div>
           </div>
           <div className="flex flex-col items-end gap-1">

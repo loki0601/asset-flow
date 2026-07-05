@@ -72,8 +72,11 @@ export function Modal({
       }}
       className={`w-[92vw] ${maxWidthClass} bg-transparent rounded-[32px] backdrop:bg-black/40 backdrop:backdrop-blur-sm`}
     >
+      {/* Mount children only while open — a closed modal used to keep its
+          full subtree alive in the DOM (the asset picker's result list,
+          detail charts, …), taxing every render of the host page. */}
       <div className={`bg-white rounded-[32px] no-scrollbar ${fillHeight ? 'h-full flex flex-col overflow-hidden pb-2' : 'overflow-y-auto max-h-full pb-3'}`}>
-        {children}
+        {open ? children : null}
       </div>
     </dialog>
   );

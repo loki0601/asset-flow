@@ -4,10 +4,17 @@
  * Strategies:
  *   - /_next/static/*  (chunks, css, fonts — content-hashed)   → CacheFirst
  *   - /sql-wasm.wasm                                            → CacheFirst
- *   - HTML navigations (mode=navigate / app routes)             → NetworkFirst
+ *   - HTML navigations (mode=navigate / app routes)             → NetworkFirst + timeout
  *   - GET /api/catalog, /api/catalog/version                    → StaleWhileRevalidate
  *   - GET /api/prices*, /api/prices/live, /api/fx*              → NetworkFirst
  *   - POST and other mutating methods                           → Network only (pass-through)
+ *
+ * Why navigations get a TIMEOUT: plain NetworkFirst awaits the full
+ * Cloudflare-tunnel round trip before rendering anything, so a slow tunnel
+ * made every page transition crawl. The timeout races the network against
+ * NAV_TIMEOUT_MS and serves the cached page when the network is slower —
+ * fresh HTML still wins whenever the tunnel responds in time, so deploys
+ * keep propagating normally (the no-store header policy stays authoritative).
  *
  * Why prices are NetworkFirst (not SWR): SWR returns the *cached* response
  * immediately and only refreshes the cache in the background, so the app
@@ -18,8 +25,12 @@
  * Cache version is bumped here on intentional invalidation (or via the
  * client posting {type: 'BUMP_CACHE'}). Old caches are pruned on activate.
  */
-const VERSION = 'v5';
+const VERSION = 'v6';
 const CACHE = `assetflow-${VERSION}`;
+
+// Navigation network deadline. Long enough for a healthy tunnel round trip,
+// short enough that a congested one falls back to cache instead of blocking.
+const NAV_TIMEOUT_MS = 2500;
 
 const STATIC_PATTERNS = [/^\/_next\/static\//, /\.wasm$/, /\/sql-wasm\.wasm$/];
 // Catalog is large and changes rarely → serve cached instantly, refresh behind.
@@ -34,14 +45,15 @@ const NETWORK_FIRST_API_PATTERNS = [
  * Pure routing decision — given a request's pathname/method/mode, return the
  * caching strategy name. Kept side-effect free (no `caches`/`fetch`) so it can
  * be unit-tested directly against this file. Returns one of:
- *   'cacheFirst' | 'staleWhileRevalidate' | 'networkFirst' | 'passthrough'
+ *   'cacheFirst' | 'staleWhileRevalidate' | 'networkFirst' |
+ *   'networkFirstTimeout' | 'passthrough'
  */
 function chooseStrategy(pathname, method, mode) {
   if (method && method !== 'GET') return 'passthrough';
   if (STATIC_PATTERNS.some((re) => re.test(pathname))) return 'cacheFirst';
   if (NETWORK_FIRST_API_PATTERNS.some((re) => re.test(pathname))) return 'networkFirst';
   if (SWR_API_PATTERNS.some((re) => re.test(pathname))) return 'staleWhileRevalidate';
-  if (mode === 'navigate') return 'networkFirst';
+  if (mode === 'navigate') return 'networkFirstTimeout';
   return 'passthrough';
 }
 
@@ -81,6 +93,8 @@ if (typeof self !== 'undefined' && self.addEventListener) {
       event.respondWith(staleWhileRevalidate(req));
     } else if (strategy === 'networkFirst') {
       event.respondWith(networkFirst(req));
+    } else if (strategy === 'networkFirstTimeout') {
+      event.respondWith(networkFirst(req, NAV_TIMEOUT_MS));
     }
     // 'passthrough': let the network handle it directly (no caching).
   });
@@ -124,12 +138,27 @@ async function staleWhileRevalidate(request) {
   return cached || (await networkPromise) || new Response('', { status: 504 });
 }
 
-async function networkFirst(request) {
+async function networkFirst(request, timeoutMs) {
   const cache = await caches.open(CACHE);
-  try {
-    const res = await fetch(request);
+  const networkPromise = fetch(request).then((res) => {
+    // Cache-put even when the timeout already lost the race — the fresh
+    // copy then serves the NEXT navigation instantly.
     if (res && res.ok) cache.put(request, res.clone()).catch(() => {});
     return res;
+  });
+  try {
+    if (!timeoutMs) return await networkPromise;
+    const winner = await Promise.race([
+      networkPromise,
+      new Promise((resolve) => setTimeout(() => resolve('timeout'), timeoutMs)),
+    ]);
+    if (winner !== 'timeout') return winner;
+    const cached = await cache.match(request);
+    if (cached) {
+      networkPromise.catch(() => {}); // keep background refresh from surfacing as unhandled
+      return cached;
+    }
+    return await networkPromise; // nothing cached — wait it out
   } catch {
     const cached = await cache.match(request);
     return cached || new Response('', { status: 504, statusText: 'offline' });

@@ -80,6 +80,23 @@ export function getLastPriceSyncAt(): string | null {
   return kvGet(LAST_SYNC_KEY);
 }
 
+/**
+ * True while a recent-enough sync makes another /api/prices pull pointless.
+ * Shared by the boot sync (15-min window) and the resume-from-background
+ * sync (5-min window). A missing/garbage timestamp counts as "never synced"
+ * so the sync always proceeds.
+ */
+export function isPriceSyncCooldownActive(
+  lastSyncAt: string | null,
+  nowMs: number,
+  cooldownMs: number,
+): boolean {
+  if (!lastSyncAt) return false;
+  const lastMs = Date.parse(lastSyncAt);
+  if (Number.isNaN(lastMs)) return false;
+  return nowMs - lastMs < cooldownMs;
+}
+
 export function trackSymbolHistory(symbol: string, fetchImpl: typeof fetch = fetch): void {
   void fetchImpl('/api/prices/history/track', {
     method: 'POST',

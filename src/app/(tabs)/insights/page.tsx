@@ -3,6 +3,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ChevronRight, Lightbulb } from 'lucide-react';
 import { indexEventStatusLabel } from '@/lib/insightsLabels';
+import { getCachedInsightsEvents, setCachedInsightsEvents } from '@/lib/insightsCache';
 import { eventVerb, type VerbTone } from '@/lib/eventVerb';
 import { splitDetail } from '@/lib/splitDetail';
 
@@ -12,9 +13,11 @@ import { splitDetail } from '@/lib/splitDetail';
  * reference: cardless line-feed with a centred vertical axis, date column
  * on the left and a small coloured dot tying each row to the axis.
  *
- * Data is read-mostly: events refresh once per day on the server cron, so
- * we fetch once on mount and rely on the Service Worker to serve cached
- * responses on subsequent visits. No live polling.
+ * Data is read-mostly: events refresh once per day on the server cron.
+ * Local-first: the last payload is cached in kv (insightsCache) and painted
+ * immediately on mount; the network fetch then revalidates in the
+ * background. No skeleton after the first-ever visit, and the tab still
+ * renders offline. No live polling.
  */
 
 interface ReferenceEvent {
@@ -116,11 +119,13 @@ export default function InsightsPage() {
     todayAnchorTopRef.current = null;
   }, [showPast]);
 
-  // Fetch the full window once on mount (today - 90d → today + 400d). The
-  // toggle is a pure client-side filter, so flipping it neither refetches
-  // nor causes a scroll jump.
+  // Local-first: paint the cached payload instantly, then fetch the full
+  // window (today - 90d → today + 400d) to revalidate. The toggle is a pure
+  // client-side filter, so flipping it neither refetches nor scroll-jumps.
   useEffect(() => {
     let cancelled = false;
+    const cached = getCachedInsightsEvents<ReferenceEvent>();
+    if (cached) setEvents(cached);
     (async () => {
       try {
         const params = new URLSearchParams({ limit: '500' });
@@ -130,9 +135,16 @@ export default function InsightsPage() {
         const res = await fetch(`/api/insights/events?${params.toString()}`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = (await res.json()) as { events: ReferenceEvent[] };
-        if (!cancelled) setEvents(data.events ?? []);
+        if (!cancelled) {
+          setEvents(data.events ?? []);
+          setCachedInsightsEvents(data.events ?? []);
+        }
       } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : String(err));
+        // With a cached paint on screen, a failed revalidate stays silent;
+        // only a truly-empty first visit surfaces the error banner.
+        if (!cancelled && !cached) {
+          setError(err instanceof Error ? err.message : String(err));
+        }
       }
     })();
     return () => {

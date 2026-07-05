@@ -102,6 +102,13 @@ export function isLiveWindow(symbol: string, now: Date): boolean {
   return true;
 }
 
+/** True iff any of the symbols' markets is currently in a live window.
+ *  Gates the in-session live polling loop so it only hits the server while
+ *  a fresh tick is actually possible. */
+export function anyLiveWindow(symbols: readonly string[], now: Date): boolean {
+  return symbols.some((s) => isLiveWindow(s, now));
+}
+
 /** Returns the price_history date row a live tick should be written to,
  *  or null when the market is closed. */
 export function liveDateFor(symbol: string, now: Date): string | null {

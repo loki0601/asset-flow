@@ -6,6 +6,7 @@ import { priceHistoryRepo, type PriceHistoryRow } from '@/lib/priceHistoryRepo';
 import { fxHistoryRepo } from '@/lib/fxHistoryRepo';
 import {
   computePortfolioFlow,
+  syntheticBuyAnchor,
   type FxLookup,
   type PortfolioTx,
   type SymbolMeta,
@@ -22,11 +23,10 @@ import type { Holding, Transaction } from '@/lib/schema';
  *
  *   - With real transactions: chart starts at the first tx date and reacts
  *     to subsequent buys/sells.
- *   - With holdings but no transactions (legacy/seed data): treats the
- *     position as if always held — anchors the synthetic buy at the
- *     earliest known close so the curve shows the full backcast for the
- *     current basket. Without this, h.createdAt's "today" timestamp would
- *     collapse the chart to a single point.
+ *   - With holdings but no transactions (legacy/seed data): a synthetic buy
+ *     anchored at the holding's createdAt (see syntheticBuyAnchor) — the
+ *     chart starts when the position actually entered the app, not at the
+ *     earliest price row (which fabricated years of phantom history).
  *   - Missing local history triggers an automatic GET /api/prices/history
  *     fetch, and the chart re-renders once rows arrive.
  */
@@ -54,11 +54,11 @@ function buildTxs(
     const key = `${h.accountId}:${h.symbol}`;
     if (seenAccountSymbol.has(key)) continue;
     const hist = histories.get(h.symbol);
-    const anchor =
-      hist?.[0]?.date ??
-      (h.createdAt
-        ? h.createdAt.slice(0, 10)
-        : new Date().toISOString().slice(0, 10));
+    const anchor = syntheticBuyAnchor(
+      h.createdAt,
+      hist?.[0]?.date,
+      new Date().toISOString().slice(0, 10),
+    );
     syntheticTxs.push({
       symbol: h.symbol,
       type: 'buy',
@@ -96,9 +96,11 @@ function buildCashflows(
   }
   for (const h of allHoldings) {
     if (seen.has(`${h.accountId}:${h.symbol}`)) continue;
-    const date =
-      histories.get(h.symbol)?.[0]?.date ??
-      (h.createdAt ? h.createdAt.slice(0, 10) : new Date().toISOString().slice(0, 10));
+    const date = syntheticBuyAnchor(
+      h.createdAt,
+      histories.get(h.symbol)?.[0]?.date,
+      new Date().toISOString().slice(0, 10),
+    );
     const usd = getMarketAsset(h.symbol)?.currency === 'USD';
     events.push({ date, krw: h.quantity * h.avgPrice * (usd ? fxNow : 1) });
   }

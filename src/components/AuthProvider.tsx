@@ -25,11 +25,13 @@ import {
 } from '@/lib/catalog';
 import {
   getLastPriceSyncAt,
+  isPriceSyncCooldownActive,
   needsDeepBackfill,
   syncLivePrices,
   syncPrices,
   trackSymbolHistory,
 } from '@/lib/prices';
+import { anyLiveWindow } from '@/lib/marketHours';
 import { syncFxHistory } from '@/lib/fx';
 import { prefetchHeldLogos, syncBrandIconManifest } from '@/lib/brandIconCache';
 import { holdingsRepo } from '@/lib/repos';
@@ -160,10 +162,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [refreshPrices]);
 
   // When the app comes back to foreground, check for any pending native-side
-  // sync the FirebaseMessagingService left behind while we were dead.
+  // sync the FirebaseMessagingService left behind while we were dead, then
+  // pull fresh prices (5-min cooldown) — resume used to rely entirely on
+  // FCM/native prefetch, so a failed push meant silently stale prices until
+  // a manual tap or cold restart.
   // Also flush any debounced persistDb writes when the app goes hidden,
   // since the WebView process may be killed without firing microtasks.
   useEffect(() => {
+    const RESUME_COOLDOWN_MS = 5 * 60 * 1000;
     const handler = () => {
       if (document.visibilityState === 'hidden') {
         flushPersistDb();
@@ -177,10 +183,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
         })
         .catch((err) => console.warn('[AuthProvider] visibility ingest skipped', err));
+      if (!isPriceSyncCooldownActive(getLastPriceSyncAt(), Date.now(), RESUME_COOLDOWN_MS)) {
+        refreshPrices().catch((err) =>
+          console.warn('[AuthProvider] resume price sync skipped', err),
+        );
+      }
     };
     document.addEventListener('visibilitychange', handler);
     return () => document.removeEventListener('visibilitychange', handler);
-  }, []);
+  }, [refreshPrices]);
+
+  // In-session live polling: while the app is visible and at least one held
+  // symbol's market is open, overlay live ticks every 60s. Without this the
+  // live overlay ran only once at boot, so a screen left open during market
+  // hours never moved. anyLiveWindow gates the request so a KRX-only
+  // portfolio doesn't hit the server all night.
+  useEffect(() => {
+    if (!state.userId) return;
+    const userId = state.userId;
+    const LIVE_POLL_MS = 60 * 1000;
+    const id = setInterval(() => {
+      if (document.visibilityState !== 'visible') return;
+      const heldSymbols = Array.from(new Set(holdingsRepo.list(userId).map((h) => h.symbol)));
+      if (heldSymbols.length === 0 || !anyLiveWindow(heldSymbols, new Date())) return;
+      syncLivePrices(heldSymbols, fetch)
+        .then((r) => {
+          if (r.applied > 0) {
+            setState((prev) => ({ ...prev, pricesLastSyncAt: getLastPriceSyncAt() }));
+          }
+        })
+        .catch((err) => console.warn('[AuthProvider] live poll skipped', err));
+    }, LIVE_POLL_MS);
+    return () => clearInterval(id);
+  }, [state.userId]);
 
   useEffect(() => {
     // Service worker registration — must run before initDb so the WASM
@@ -214,8 +249,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Catalog sync on boot — only when missing or version-mismatched.
         // The full payload is ~500KB and parsing + persisting via sql.js
         // takes seconds on the device, so guard with a cheap HEAD-style
-        // /api/catalog/version probe first.
-        (async () => {
+        // /api/catalog/version probe first. The promise is kept so the
+        // price sync below can sequence AFTER it — both write the catalog
+        // assets key, and letting them race allowed a stale catalog payload
+        // to land after (and clobber) freshly synced prices.
+        const catalogSyncDone = (async () => {
           try {
             const localVer = getLocalCatalogVersion();
             const needsFullSync = !hasLocalCatalog();
@@ -291,6 +329,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (userId) {
           (async () => {
             try {
+              // Sequence after the catalog sync: setLocalCatalog preserves
+              // fresher local prices, but running prices AFTER catalog also
+              // guarantees a version-bump boot ends with today's prices.
+              await catalogSyncDone;
               const heldSymbols = Array.from(
                 new Set(holdingsRepo.list(userId).map((h) => h.symbol)),
               );
@@ -299,11 +341,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               // needs a deep-history pull — otherwise users who restarted
               // mid-cooldown after a backfill schema change would be stuck
               // with no historical rows until they tap refresh manually.
-              const last = getLastPriceSyncAt();
-              const lastMs = last ? new Date(last).getTime() : 0;
-              const COOLDOWN_MS = 15 * 60 * 1000;
+              const BOOT_COOLDOWN_MS = 15 * 60 * 1000;
               if (
-                Date.now() - lastMs < COOLDOWN_MS &&
+                isPriceSyncCooldownActive(getLastPriceSyncAt(), Date.now(), BOOT_COOLDOWN_MS) &&
                 !needsDeepBackfill(heldSymbols)
               ) {
                 return;

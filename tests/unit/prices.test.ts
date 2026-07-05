@@ -12,6 +12,7 @@ import { setStorage } from '@/lib/storage';
 import { listLocalAssets, setLocalCatalog } from '@/lib/catalog';
 import {
   getLastPriceSyncAt,
+  isPriceSyncCooldownActive,
   markFullBackfilled,
   syncPrices,
   type PricePayload,
@@ -330,5 +331,29 @@ describe('syncPrices — history sync (held symbols)', () => {
     await syncPrices(fetch, ['KRX:UNKNOWN']);
 
     expect(priceHistoryRepo.getMaxDate('KRX:UNKNOWN')).toBe('2026-05-14');
+  });
+});
+
+describe('isPriceSyncCooldownActive', () => {
+  // Shared by the boot sync (15-min) and the resume-from-background sync
+  // (5-min): decides whether a fresh /api/prices pull is worth it.
+  const T0 = Date.parse('2026-07-05T10:00:00+09:00');
+
+  it('inactive when there has never been a sync', () => {
+    expect(isPriceSyncCooldownActive(null, T0, 15 * 60 * 1000)).toBe(false);
+  });
+
+  it('active when the last sync is inside the window', () => {
+    const last = new Date(T0 - 4 * 60 * 1000).toISOString();
+    expect(isPriceSyncCooldownActive(last, T0, 5 * 60 * 1000)).toBe(true);
+  });
+
+  it('inactive when the last sync is outside the window', () => {
+    const last = new Date(T0 - 6 * 60 * 1000).toISOString();
+    expect(isPriceSyncCooldownActive(last, T0, 5 * 60 * 1000)).toBe(false);
+  });
+
+  it('inactive when the stored timestamp is unparseable', () => {
+    expect(isPriceSyncCooldownActive('garbage', T0, 5 * 60 * 1000)).toBe(false);
   });
 });

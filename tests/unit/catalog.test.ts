@@ -69,6 +69,69 @@ describe('setLocalCatalog / listLocalAssets / getLocalCatalogVersion', () => {
   });
 });
 
+describe('setLocalCatalog — price freshness preservation', () => {
+  // Regression: /api/catalog is built once at server (re)start, so its
+  // currentPrice/updatedAt can be older than what the client already pulled
+  // via /api/prices. A catalog re-sync (version bump / deploy) must never
+  // clobber fresher local prices with the catalog's frozen ones.
+  const withPrice = (
+    symbol: string,
+    price: number,
+    updatedAt: string,
+  ): MarketAsset => ({
+    ...sampleAsset(symbol),
+    currentPrice: price,
+    dailyChange: 1,
+    dailyChangePct: 0.5,
+    updatedAt,
+  });
+
+  it('keeps fresher local price fields when the incoming catalog is older', () => {
+    setLocalCatalog('1.0.0', [withPrice('KRX:000660', 2_582_000, '2026-07-02T05:40:00+09:00')]);
+    // Server rebuilt yesterday — its baked-in price predates the local one.
+    setLocalCatalog('1.0.1', [withPrice('KRX:000660', 2_888_000, '2026-06-22T15:35:00+09:00')]);
+    const a = getLocalAsset('KRX:000660')!;
+    expect(a.currentPrice).toBe(2_582_000);
+    expect(a.updatedAt).toBe('2026-07-02T05:40:00+09:00');
+  });
+
+  it('adopts incoming prices when they are newer than local', () => {
+    setLocalCatalog('1.0.0', [withPrice('KRX:000660', 2_582_000, '2026-07-01T15:35:00+09:00')]);
+    setLocalCatalog('1.0.1', [withPrice('KRX:000660', 2_394_000, '2026-07-05T05:40:00+09:00')]);
+    expect(getLocalAsset('KRX:000660')?.currentPrice).toBe(2_394_000);
+  });
+
+  it('keeps local price when the incoming asset has no price timestamp', () => {
+    setLocalCatalog('1.0.0', [withPrice('KRX:000660', 2_582_000, '2026-07-02T05:40:00+09:00')]);
+    setLocalCatalog('1.0.1', [withPrice('KRX:000660', 0, '')]);
+    expect(getLocalAsset('KRX:000660')?.currentPrice).toBe(2_582_000);
+  });
+
+  it('still adopts non-price fields (name, deprecated) from the incoming catalog', () => {
+    setLocalCatalog('1.0.0', [withPrice('KRX:000660', 2_582_000, '2026-07-02T05:40:00+09:00')]);
+    const incoming = {
+      ...withPrice('KRX:000660', 2_888_000, '2026-06-22T15:35:00+09:00'),
+      name: 'SK하이닉스(개명)',
+      deprecated: true,
+    };
+    setLocalCatalog('1.0.1', [incoming]);
+    const a = getLocalAsset('KRX:000660')!;
+    expect(a.name).toBe('SK하이닉스(개명)');
+    expect(a.deprecated).toBe(true);
+    expect(a.currentPrice).toBe(2_582_000); // price still preserved
+  });
+
+  it('adds brand-new symbols from the incoming catalog untouched', () => {
+    setLocalCatalog('1.0.0', [withPrice('KRX:000660', 2_582_000, '2026-07-02T05:40:00+09:00')]);
+    setLocalCatalog('1.0.1', [
+      withPrice('KRX:000660', 2_888_000, '2026-06-22T15:35:00+09:00'),
+      withPrice('KRX:005930', 80_000, '2026-06-22T15:35:00+09:00'),
+    ]);
+    expect(getLocalAsset('KRX:005930')?.currentPrice).toBe(80_000);
+    expect(listLocalAssets()).toHaveLength(2);
+  });
+});
+
 describe('applyMigration: rename_symbol', () => {
   it('renames holdings.symbol for every user', () => {
     kvSet('assetflow:users', JSON.stringify([{ id: 'u1' }, { id: 'u2' }]));

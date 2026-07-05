@@ -3,6 +3,17 @@ import type { NextConfig } from 'next';
 const config: NextConfig = {
   reactStrictMode: true,
   devIndicators: false,
+  experimental: {
+    // Client-router RSC payload reuse. Default dynamic=0 meant every bottom-tab
+    // switch refetched the page payload over the Cloudflare tunnel — the main
+    // "페이지 이동이 느리다" cost. Tab pages render from LOCAL data (repos/sqlite),
+    // so a 5-minute-stale shell payload is harmless; page *content* stays live
+    // via client state. Hard navigations still obey the no-store header policy.
+    staleTimes: {
+      dynamic: 300,
+      static: 300,
+    },
+  },
   async headers() {
     return [
       {

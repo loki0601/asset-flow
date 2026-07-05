@@ -52,8 +52,20 @@ describe('sw chooseStrategy', () => {
     expect(chooseStrategy('/sql-wasm.wasm')).toBe('cacheFirst');
   });
 
-  it('serves HTML navigations network-first', () => {
-    expect(chooseStrategy('/holdings', 'GET', 'navigate')).toBe('networkFirst');
+  it('serves HTML navigations network-first WITH a timeout', () => {
+    // Plain networkFirst awaited the full Cloudflare-tunnel round trip on
+    // every page navigation before rendering anything — the "페이지 이동이
+    // 매우 느리다" symptom. networkFirstTimeout races the network against a
+    // short deadline and falls back to the cached copy, so a slow tunnel
+    // bounds navigation latency instead of blocking it.
+    expect(chooseStrategy('/holdings', 'GET', 'navigate')).toBe('networkFirstTimeout');
+  });
+
+  it('exposes a finite navigation timeout', () => {
+    const navTimeout = new Function(`${src}\n; return NAV_TIMEOUT_MS;`)() as number;
+    expect(Number.isFinite(navTimeout)).toBe(true);
+    expect(navTimeout).toBeGreaterThan(0);
+    expect(navTimeout).toBeLessThanOrEqual(5000);
   });
 
   it('passes through mutations and unmatched GETs', () => {

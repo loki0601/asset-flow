@@ -59,8 +59,37 @@ export function getLocalAsset(symbol: string): MarketAsset | undefined {
   return getCache()?.map.get(symbol);
 }
 
+/** Parse an asset's price timestamp; NaN when missing/unparseable. */
+function priceTime(a: MarketAsset): number {
+  return a.updatedAt ? Date.parse(a.updatedAt) : NaN;
+}
+
 export function setLocalCatalog(version: string, assets: MarketAsset[]): void {
-  kvSet(ASSETS_KEY, JSON.stringify(assets));
+  // Price-freshness merge: /api/catalog bakes currentPrice/updatedAt in at
+  // server (re)start, so a catalog re-sync after a deploy can carry prices
+  // OLDER than what this client already pulled via /api/prices — and the
+  // boot catalog-sync races the boot price-sync on the same key. Never let
+  // the catalog clobber a fresher local price; adopt everything else
+  // (name, deprecated, category, …) from the incoming payload.
+  const local = getCache()?.map;
+  const merged = !local
+    ? assets
+    : assets.map((incoming) => {
+        const prev = local.get(incoming.symbol);
+        if (!prev) return incoming;
+        const prevT = priceTime(prev);
+        const nextT = priceTime(incoming);
+        if (Number.isNaN(prevT)) return incoming;
+        if (!Number.isNaN(nextT) && nextT >= prevT) return incoming;
+        return {
+          ...incoming,
+          currentPrice: prev.currentPrice,
+          dailyChange: prev.dailyChange,
+          dailyChangePct: prev.dailyChangePct,
+          updatedAt: prev.updatedAt,
+        };
+      });
+  kvSet(ASSETS_KEY, JSON.stringify(merged));
   kvSet(VERSION_KEY, version);
   kvSet(LAST_SYNC_KEY, new Date().toISOString());
   invalidateCatalogCache();
