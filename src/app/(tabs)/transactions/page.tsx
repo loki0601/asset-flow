@@ -15,11 +15,13 @@ import {
   type TradePeriod,
 } from '@/lib/transactionHistory';
 import { assetDisplayName, fallbackAsset } from '@/lib/assetDisplay';
+import { accountOwnerLabel } from '@/lib/accountLabel';
 import { categoryColor } from '@/lib/categoryColors';
 import { formatPrice } from '@/lib/loans';
 import { AssetCategoryIcon } from '@/components/AssetCategoryIcon';
 import { RangeCalendar } from '@/components/RangeCalendar';
 import { EmptyState } from '@/components/EmptyState';
+import { TradeDetailModal } from '@/features/transactions/TradeDetailModal';
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
 
@@ -67,6 +69,7 @@ export default function TransactionsPage() {
   });
   // Calendar collapses once a full range is picked; re-tapping 직접 선택 reopens it.
   const [calOpen, setCalOpen] = useState(false);
+  const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
 
   useEffect(() => {
     if (!userId) return;
@@ -91,10 +94,7 @@ export default function TransactionsPage() {
 
   function accountLabel(accountId: string): string {
     const acc = accountById.get(accountId);
-    if (!acc) return '계좌 미지정';
-    const member = memberById.get(acc.memberId);
-    const owner = member ? `${member.name} · ` : '';
-    return `${owner}${acc.institution} ${acc.name}`;
+    return accountOwnerLabel(acc, acc ? memberById.get(acc.memberId) : undefined);
   }
 
   return (
@@ -159,13 +159,28 @@ export default function TransactionsPage() {
               </p>
               <div className="bg-white rounded-[2rem] border border-brand-line shadow-sm divide-y divide-brand-surface overflow-hidden">
                 {group.items.map((t) => (
-                  <TradeRow key={t.id} tx={t} label={accountLabel(t.accountId)} theme={theme} />
+                  <TradeRow
+                    key={t.id}
+                    tx={t}
+                    label={accountLabel(t.accountId)}
+                    theme={theme}
+                    onSelect={() => setSelectedTx(t)}
+                  />
                 ))}
               </div>
             </section>
           ))}
         </div>
       )}
+
+      <TradeDetailModal
+        open={selectedTx !== null}
+        onClose={() => setSelectedTx(null)}
+        tx={selectedTx}
+        asset={assetFor(selectedTx?.symbol ?? '')}
+        accountLabel={selectedTx ? accountLabel(selectedTx.accountId) : ''}
+        dateLabel={selectedTx ? formatDateHeader(selectedTx.occurredAt.slice(0, 10)) : ''}
+      />
     </div>
   );
 }
@@ -174,10 +189,12 @@ function TradeRow({
   tx,
   label,
   theme,
+  onSelect,
 }: {
   tx: Transaction;
   label: string;
   theme: 'light' | 'dark';
+  onSelect: () => void;
 }) {
   const asset = assetFor(tx.symbol ?? '');
   const color = categoryColor(asset.category, theme);
@@ -186,7 +203,11 @@ function TradeRow({
   const pnl = realizedPnl(tx);
 
   return (
-    <div className="flex items-center gap-3 p-4">
+    <button
+      type="button"
+      onClick={onSelect}
+      className="w-full flex items-center gap-3 p-4 text-left hover:bg-brand-surface active:bg-brand-surface transition-colors"
+    >
       <AssetCategoryIcon asset={asset} color={color} size={40} />
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5">
@@ -225,6 +246,6 @@ function TradeRow({
           </p>
         )}
       </div>
-    </div>
+    </button>
   );
 }

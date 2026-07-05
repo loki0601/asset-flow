@@ -1,5 +1,5 @@
 {
-  "as_of": "2026-07-05T05:40:08+09:00",
+  "as_of": "2026-07-05T15:35:09+09:00",
   "count": 4132,
   "prices": {
     "KRX:005930": {
@@ -20163,504 +20163,504 @@
       "changePct": -15.999461539929428
     },
     "CRYPTO:BTC": {
-      "price": 95470236.0,
-      "change": 1467616.20291,
-      "changePct": 1.53725
+      "price": 95947635.0,
+      "change": 520669.43609100004,
+      "changePct": 0.54266
     },
     "CRYPTO:ETH": {
-      "price": 2682827.0,
-      "change": 69365.8334985,
-      "changePct": 2.58555
+      "price": 2697780.0,
+      "change": 15113.233337999998,
+      "changePct": 0.56021
     },
     "CRYPTO:USDT": {
-      "price": 1527.96,
-      "change": 2.6826393719999997,
-      "changePct": 0.17557
+      "price": 1527.46,
+      "change": -0.5314033340000001,
+      "changePct": -0.03479
     },
     "CRYPTO:BNB": {
-      "price": 870667.0,
-      "change": 13083.861275799998,
-      "changePct": 1.50274
+      "price": 874048.0,
+      "change": 3679.0428416000004,
+      "changePct": 0.42092
     },
     "CRYPTO:USDC": {
-      "price": 1529.1,
-      "change": 2.27560662,
-      "changePct": 0.14882
+      "price": 1528.49,
+      "change": -0.526717654,
+      "changePct": -0.03446
     },
     "CRYPTO:XRP": {
-      "price": 1736.92,
-      "change": 53.749510476,
-      "changePct": 3.09453
+      "price": 1738.42,
+      "change": 0.495971226,
+      "changePct": 0.02853
     },
     "CRYPTO:SOL": {
-      "price": 126372.0,
-      "change": 2810.8671216,
-      "changePct": 2.22428
+      "price": 123039.0,
+      "change": -3146.1441417,
+      "changePct": -2.55703
     },
     "CRYPTO:TRX": {
-      "price": 493.44,
-      "change": 6.9232592639999995,
-      "changePct": 1.40306
+      "price": 496.11,
+      "change": 2.667434637,
+      "changePct": 0.53767
     },
     "CRYPTO:FIGR_HELOC": {
       "price": 1542.35,
-      "change": -43.123489060000004,
-      "changePct": -2.79596
+      "change": 0.0,
+      "changePct": 0.0
     },
     "CRYPTO:HYPE": {
-      "price": 108611.0,
-      "change": 6220.912246999999,
-      "changePct": 5.7277
+      "price": 104847.0,
+      "change": -3771.5457993,
+      "changePct": -3.59719
     },
     "CRYPTO:DOGE": {
-      "price": 117.52,
-      "change": 2.838060992,
-      "changePct": 2.41496
+      "price": 115.94,
+      "change": -1.5702681719999998,
+      "changePct": -1.35438
     },
     "CRYPTO:RAIN": {
-      "price": 23.63,
-      "change": -0.156751968,
-      "changePct": -0.66336
+      "price": 23.46,
+      "change": -0.167617008,
+      "changePct": -0.71448
     },
     "CRYPTO:USDS": {
-      "price": 1528.91,
-      "change": 2.3551329640000005,
-      "changePct": 0.15404
+      "price": 1528.38,
+      "change": -0.5117016240000001,
+      "changePct": -0.03348
     },
     "CRYPTO:LEO": {
-      "price": 14003.91,
-      "change": 85.44205608299998,
-      "changePct": 0.61013
+      "price": 14004.84,
+      "change": 0.929921376,
+      "changePct": 0.00664
     },
     "CRYPTO:ZEC": {
-      "price": 704567.0,
-      "change": 40501.5407981,
-      "changePct": 5.74843
-    },
-    "CRYPTO:XLM": {
-      "price": 314.66,
-      "change": 10.704764666,
-      "changePct": 3.40201
-    },
-    "CRYPTO:WBT": {
-      "price": 86445.0,
-      "change": 1232.6797665,
-      "changePct": 1.42597
+      "price": 696284.0,
+      "change": -7920.5090136,
+      "changePct": -1.13754
     },
     "CRYPTO:ADA": {
-      "price": 270.28,
-      "change": 19.187420451999998,
-      "changePct": 7.09909
+      "price": 289.11,
+      "change": 20.146167774000002,
+      "changePct": 6.96834
+    },
+    "CRYPTO:XLM": {
+      "price": 305.62,
+      "change": -8.774075142,
+      "changePct": -2.87091
+    },
+    "CRYPTO:WBT": {
+      "price": 86536.0,
+      "change": 91.2435584,
+      "changePct": 0.10544
     },
     "CRYPTO:XMR": {
-      "price": 501213.0,
-      "change": 16023.8798526,
-      "changePct": 3.19702
+      "price": 508784.0,
+      "change": 7641.5795312,
+      "changePct": 1.50193
     },
     "CRYPTO:LINK": {
-      "price": 12081.5,
-      "change": 203.63247434999997,
-      "changePct": 1.68549
+      "price": 12040.53,
+      "change": -42.94736645700001,
+      "changePct": -0.35669
     },
     "CRYPTO:CC": {
-      "price": 212.67,
-      "change": -0.173921526,
-      "changePct": -0.08178
-    },
-    "CRYPTO:GRAM": {
-      "price": 2747.66,
-      "change": 240.29770436399997,
-      "changePct": 8.74554
-    },
-    "CRYPTO:DAI": {
-      "price": 1528.77,
-      "change": 1.617591537,
-      "changePct": 0.10581
-    },
-    "CRYPTO:USD1": {
-      "price": 1527.23,
-      "change": 1.803505907,
-      "changePct": 0.11809
-    },
-    "CRYPTO:BCH": {
-      "price": 345491.0,
-      "change": 5498.489264999999,
-      "changePct": 1.5915
-    },
-    "CRYPTO:USDE": {
-      "price": 1527.4,
-      "change": 2.64881708,
-      "changePct": 0.17342
-    },
-    "CRYPTO:LTC": {
-      "price": 67350.0,
-      "change": 1311.72207,
-      "changePct": 1.94762
-    },
-    "CRYPTO:HBAR": {
-      "price": 110.55,
-      "change": 1.45258278,
-      "changePct": 1.31396
-    },
-    "CRYPTO:USYC": {
-      "price": 1728.17,
-      "change": 0.429795879,
-      "changePct": 0.02487
-    },
-    "CRYPTO:SUI": {
-      "price": 1155.42,
-      "change": 26.060498100000004,
-      "changePct": 2.2555
-    },
-    "CRYPTO:USDG": {
-      "price": 1529.3,
-      "change": 1.43188359,
-      "changePct": 0.09363
-    },
-    "CRYPTO:AVAX": {
-      "price": 10492.33,
-      "change": 30.378443049,
-      "changePct": 0.28953
-    },
-    "CRYPTO:PYUSD": {
-      "price": 1529.02,
-      "change": 1.573208678,
-      "changePct": 0.10289
-    },
-    "CRYPTO:CRO": {
-      "price": 91.16,
-      "change": 4.592668148,
-      "changePct": 5.03803
+      "price": 213.56,
+      "change": 0.895286232,
+      "changePct": 0.41922
     },
     "CRYPTO:LAB": {
-      "price": 13051.73,
-      "change": -1160.467164317,
-      "changePct": -8.89129
+      "price": 24782.0,
+      "change": 22158.451091799998,
+      "changePct": 89.41349
     },
-    "CRYPTO:NEAR": {
-      "price": 3054.01,
-      "change": 69.287851875,
-      "changePct": 2.26875
+    "CRYPTO:GRAM": {
+      "price": 2692.48,
+      "change": -55.82453408000001,
+      "changePct": -2.07335
     },
-    "CRYPTO:SHIB": {
-      "price": 0.00671753,
-      "change": 0.000192634577292,
-      "changePct": 2.86764
+    "CRYPTO:BCH": {
+      "price": 362693.0,
+      "change": 18041.619245500002,
+      "changePct": 4.97435
+    },
+    "CRYPTO:DAI": {
+      "price": 1528.26,
+      "change": -0.5107444919999999,
+      "changePct": -0.03342
+    },
+    "CRYPTO:USD1": {
+      "price": 1526.69,
+      "change": -0.924716133,
+      "changePct": -0.06057
+    },
+    "CRYPTO:USDE": {
+      "price": 1526.61,
+      "change": -0.74345907,
+      "changePct": -0.0487
+    },
+    "CRYPTO:LTC": {
+      "price": 67598.0,
+      "change": 233.03058539999998,
+      "changePct": 0.34473
+    },
+    "CRYPTO:HBAR": {
+      "price": 113.76,
+      "change": 3.195984816,
+      "changePct": 2.80941
+    },
+    "CRYPTO:USYC": {
+      "price": 1727.64,
+      "change": -0.5944809240000001,
+      "changePct": -0.03441
+    },
+    "CRYPTO:USDG": {
+      "price": 1528.65,
+      "change": -0.32942407500000004,
+      "changePct": -0.02155
+    },
+    "CRYPTO:SUI": {
+      "price": 1134.97,
+      "change": -19.303796754,
+      "changePct": -1.70082
+    },
+    "CRYPTO:AVAX": {
+      "price": 10354.89,
+      "change": -124.83958932899999,
+      "changePct": -1.20561
+    },
+    "CRYPTO:PYUSD": {
+      "price": 1528.58,
+      "change": -0.172882398,
+      "changePct": -0.01131
+    },
+    "CRYPTO:CRO": {
+      "price": 91.67,
+      "change": 0.5605987179999999,
+      "changePct": 0.61154
     },
     "CRYPTO:XAUT": {
-      "price": 6354874.0,
-      "change": 15112.525859399999,
-      "changePct": 0.23781
+      "price": 6361097.0,
+      "change": 6221.788975699999,
+      "changePct": 0.09781
+    },
+    "CRYPTO:SHIB": {
+      "price": 0.00659536,
+      "change": -0.000123328615248,
+      "changePct": -1.86993
+    },
+    "CRYPTO:NEAR": {
+      "price": 2979.98,
+      "change": -73.278602194,
+      "changePct": -2.45903
     },
     "CRYPTO:BUIDL": {
-      "price": 1529.25,
-      "change": 1.501876425,
-      "changePct": 0.09821
+      "price": 1528.78,
+      "change": -0.469794094,
+      "changePct": -0.03073
     },
     "CRYPTO:USDY": {
-      "price": 1735.87,
-      "change": 0.090438827,
-      "changePct": 0.00521
-    },
-    "CRYPTO:M": {
-      "price": 2427.35,
-      "change": -153.988413915,
-      "changePct": -6.34389
+      "price": 1738.26,
+      "change": 2.5455079439999997,
+      "changePct": 0.14644
     },
     "CRYPTO:TAO": {
-      "price": 327628.0,
-      "change": 1359.8527768,
-      "changePct": 0.41506
+      "price": 325887.0,
+      "change": -1439.5406451,
+      "changePct": -0.44173
     },
     "CRYPTO:UNI": {
-      "price": 4863.57,
-      "change": -32.098102929,
-      "changePct": -0.65997
+      "price": 4865.28,
+      "change": 1.5053176319999997,
+      "changePct": 0.03094
+    },
+    "CRYPTO:M": {
+      "price": 2197.56,
+      "change": -216.3223125,
+      "changePct": -9.84375
     },
     "CRYPTO:PAXG": {
-      "price": 6361252.0,
-      "change": 14613.7042196,
-      "changePct": 0.22973
+      "price": 6364120.0,
+      "change": 3612.9109240000003,
+      "changePct": 0.05677
     },
     "CRYPTO:WLFI": {
-      "price": 86.39,
-      "change": -1.04048116,
-      "changePct": -1.2044
+      "price": 87.92,
+      "change": 1.6233109199999998,
+      "changePct": 1.84635
     },
     "CRYPTO:ASTER": {
-      "price": 978.71,
-      "change": 4.96303841,
-      "changePct": 0.5071
+      "price": 976.92,
+      "change": -1.9561846079999998,
+      "changePct": -0.20024
     },
     "CRYPTO:OKB": {
-      "price": 124658.0,
-      "change": 1984.3309755999999,
-      "changePct": 1.59182
+      "price": 122491.0,
+      "change": -1887.4393208,
+      "changePct": -1.54088
     },
     "CRYPTO:ONDO": {
-      "price": 510.17,
-      "change": 6.075818598000001,
-      "changePct": 1.19094
+      "price": 501.39,
+      "change": -8.232522966,
+      "changePct": -1.64194
     },
     "CRYPTO:RLUSD": {
-      "price": 1529.11,
-      "change": 0.824496112,
-      "changePct": 0.05392
-    },
-    "CRYPTO:WLD": {
-      "price": 669.22,
-      "change": 28.654929648000003,
-      "changePct": 4.28184
+      "price": 1529.03,
+      "change": -0.099539853,
+      "changePct": -0.00651
     },
     "CRYPTO:HTX": {
-      "price": 0.00258985,
-      "change": 5.7123544495e-05,
-      "changePct": 2.20567
+      "price": 0.00258801,
+      "change": -1.824288249e-06,
+      "changePct": -0.07049
     },
     "CRYPTO:DOT": {
-      "price": 1336.55,
-      "change": 31.569845619999995,
-      "changePct": 2.36204
+      "price": 1325.83,
+      "change": -10.881882308,
+      "changePct": -0.82076
     },
     "CRYPTO:MNT": {
-      "price": 677.66,
-      "change": 4.844049212,
-      "changePct": 0.71482
+      "price": 675.22,
+      "change": -2.7723182760000005,
+      "changePct": -0.41058
+    },
+    "CRYPTO:WLD": {
+      "price": 630.47,
+      "change": -36.485866323,
+      "changePct": -5.78709
     },
     "CRYPTO:USDF": {
-      "price": 1523.74,
-      "change": 2.287438488,
-      "changePct": 0.15012
+      "price": 1523.39,
+      "change": -0.357691972,
+      "changePct": -0.02348
     },
     "CRYPTO:USDD": {
-      "price": 1523.27,
-      "change": -2.7367068819999996,
-      "changePct": -0.17966
-    },
-    "CRYPTO:SKY": {
-      "price": 89.19,
-      "change": 0.047796921,
-      "changePct": 0.05359
+      "price": 1531.84,
+      "change": 8.631458848,
+      "changePct": 0.56347
     },
     "CRYPTO:AAVE": {
-      "price": 133960.0,
-      "change": 2385.412324,
-      "changePct": 1.78069
+      "price": 133906.0,
+      "change": -53.4686658,
+      "changePct": -0.03993
     },
     "CRYPTO:BFUSD": {
-      "price": 1526.82,
-      "change": 2.47802886,
-      "changePct": 0.1623
+      "price": 1526.6,
+      "change": -0.21051814,
+      "changePct": -0.01379
+    },
+    "CRYPTO:SKY": {
+      "price": 84.65,
+      "change": -4.316608240000001,
+      "changePct": -5.09936
     },
     "CRYPTO:MORPHO": {
-      "price": 3059.69,
-      "change": -0.7569673060000001,
-      "changePct": -0.02474
+      "price": 3023.36,
+      "change": -35.926284544000005,
+      "changePct": -1.18829
     },
     "CRYPTO:PI": {
-      "price": 178.81,
-      "change": -0.6654950580000001,
-      "changePct": -0.37218
+      "price": 175.11,
+      "change": -3.595463586,
+      "changePct": -2.05326
     },
     "CRYPTO:ICP": {
-      "price": 3387.59,
-      "change": 13.922656141000003,
-      "changePct": 0.41099
+      "price": 3375.74,
+      "change": -8.434623964,
+      "changePct": -0.24986
     },
     "CRYPTO:BGB": {
-      "price": 2614.3,
-      "change": 23.66778076,
-      "changePct": 0.90532
+      "price": 2624.67,
+      "change": 12.536998722,
+      "changePct": 0.47766
     },
     "CRYPTO:PEPE": {
-      "price": 0.00422236,
-      "change": 0.000499057195604,
-      "changePct": 11.81939
+      "price": 0.00405339,
+      "change": -0.00015918270538499998,
+      "changePct": -3.92715
     },
     "CRYPTO:ETC": {
-      "price": 10910.91,
-      "change": 52.697513117999996,
-      "changePct": 0.48298
+      "price": 10820.31,
+      "change": -90.509729088,
+      "changePct": -0.83648
     },
     "CRYPTO:DEXE": {
-      "price": 35228.0,
-      "change": 466.7146352,
-      "changePct": 1.32484
+      "price": 35905.0,
+      "change": 654.8748854999999,
+      "changePct": 1.82391
     },
     "CRYPTO:U": {
-      "price": 1529.4,
-      "change": 2.2648884600000003,
-      "changePct": 0.14809
+      "price": 1528.77,
+      "change": -0.473001438,
+      "changePct": -0.03094
     },
     "CRYPTO:EUTBL": {
-      "price": 1844.97,
-      "change": 0.23338870499999997,
-      "changePct": 0.01265
+      "price": 1843.59,
+      "change": -1.3718153190000002,
+      "changePct": -0.07441
     },
     "CRYPTO:QNT": {
-      "price": 103427.0,
-      "change": 238.5647182,
-      "changePct": 0.23066
+      "price": 103032.0,
+      "change": -402.5666304,
+      "changePct": -0.39072
     },
     "CRYPTO:KCS": {
-      "price": 10880.91,
-      "change": -29.684210570999998,
-      "changePct": -0.27281
+      "price": 10863.82,
+      "change": -4.924569606,
+      "changePct": -0.04533
     },
     "CRYPTO:BCAP": {
-      "price": 163583.0,
-      "change": 160.6548643,
-      "changePct": 0.09821
-    },
-    "CRYPTO:BEAT": {
-      "price": 4364.38,
-      "change": -7.800892812000001,
-      "changePct": -0.17874
+      "price": 163533.0,
+      "change": -50.2536909,
+      "changePct": -0.03073
     },
     "CRYPTO:USDGO": {
-      "price": 1528.99,
-      "change": 1.3525445539999998,
-      "changePct": 0.08846
+      "price": 1528.63,
+      "change": -0.25512834700000003,
+      "changePct": -0.01669
     },
     "CRYPTO:JTRSY": {
-      "price": 1695.49,
-      "change": 3.2202441569999998,
-      "changePct": 0.18993
-    },
-    "CRYPTO:KAS": {
-      "price": 48.32,
-      "change": 1.107924448,
-      "changePct": 2.29289
+      "price": 1694.97,
+      "change": -0.520864281,
+      "changePct": -0.03073
     },
     "CRYPTO:USTB": {
-      "price": 17023.67,
-      "change": 26.482021052,
-      "changePct": 0.15556
+      "price": 17018.44,
+      "change": -5.229766612,
+      "changePct": -0.03073
+    },
+    "CRYPTO:KAS": {
+      "price": 47.35,
+      "change": -0.9513372600000001,
+      "changePct": -2.00916
     },
     "CRYPTO:STABLE": {
-      "price": 52.69,
-      "change": -0.469689198,
-      "changePct": -0.89142
+      "price": 53.55,
+      "change": 0.88392843,
+      "changePct": 1.65066
+    },
+    "CRYPTO:BEAT": {
+      "price": 4165.02,
+      "change": -188.59418811000003,
+      "changePct": -4.52805
     },
     "CRYPTO:RENDER": {
-      "price": 2426.38,
-      "change": -12.691908504,
-      "changePct": -0.52308
+      "price": 2433.75,
+      "change": 7.659254625,
+      "changePct": 0.31471
     },
     "CRYPTO:ATOM": {
-      "price": 2424.62,
-      "change": 13.950778556,
-      "changePct": 0.57538
+      "price": 2373.6,
+      "change": -50.111917919999996,
+      "changePct": -2.11122
     },
     "CRYPTO:ALGO": {
-      "price": 135.4,
-      "change": 1.73012766,
-      "changePct": 1.27779
+      "price": 135.96,
+      "change": 0.5637445440000001,
+      "changePct": 0.41464
     },
     "CRYPTO:JUP": {
-      "price": 362.44,
-      "change": -7.2628264279999994,
-      "changePct": -2.00387
-    },
-    "CRYPTO:POL": {
-      "price": 111.62,
-      "change": -0.32219113,
-      "changePct": -0.28865
-    },
-    "CRYPTO:NEXO": {
-      "price": 1188.2,
-      "change": 5.985082220000001,
-      "changePct": 0.50371
+      "price": 364.28,
+      "change": 1.822274272,
+      "changePct": 0.50024
     },
     "CRYPTO:JST": {
-      "price": 137.98,
-      "change": 2.73621239,
-      "changePct": 1.98305
+      "price": 141.12,
+      "change": 3.23256528,
+      "changePct": 2.29065
     },
-    "CRYPTO:ENA": {
-      "price": 120.2,
-      "change": 2.0901698200000003,
-      "changePct": 1.73891
+    "CRYPTO:POL": {
+      "price": 111.41,
+      "change": -0.20564057799999996,
+      "changePct": -0.18458
     },
-    "CRYPTO:USDTB": {
-      "price": 1529.49,
-      "change": 1.956523608,
-      "changePct": 0.12792
-    },
-    "CRYPTO:ADI": {
-      "price": 8827.16,
-      "change": 53.363713063999995,
-      "changePct": 0.60454
-    },
-    "CRYPTO:GT": {
-      "price": 10265.35,
-      "change": 65.33895275,
-      "changePct": 0.6365
-    },
-    "CRYPTO:BDX": {
-      "price": 134.9,
-      "change": 0.86804103,
-      "changePct": 0.64347
+    "CRYPTO:NEXO": {
+      "price": 1171.23,
+      "change": -15.649038275999999,
+      "changePct": -1.33612
     },
     "CRYPTO:币安人生": {
-      "price": 1060.05,
-      "change": 10.481032364999999,
-      "changePct": 0.98873
+      "price": 1142.46,
+      "change": 88.72767070200001,
+      "changePct": 7.76637
+    },
+    "CRYPTO:ENA": {
+      "price": 118.34,
+      "change": -1.72983495,
+      "changePct": -1.46175
+    },
+    "CRYPTO:GT": {
+      "price": 10264.39,
+      "change": 0.152939411,
+      "changePct": 0.00149
+    },
+    "CRYPTO:ADI": {
+      "price": 8875.34,
+      "change": 51.511585826,
+      "changePct": 0.58039
+    },
+    "CRYPTO:USDTB": {
+      "price": 1529.55,
+      "change": 0.11456329500000001,
+      "changePct": 0.00749
+    },
+    "CRYPTO:BDX": {
+      "price": 135.64,
+      "change": 0.7497365359999999,
+      "changePct": 0.55274
     },
     "CRYPTO:EURSAFO": {
-      "price": 1762.93,
-      "change": 0.250512353,
-      "changePct": 0.01421
+      "price": 1761.62,
+      "change": -1.310821442,
+      "changePct": -0.07441
     },
     "CRYPTO:JAAA": {
-      "price": 1590.75,
-      "change": 3.0376961999999996,
-      "changePct": 0.19096
-    },
-    "CRYPTO:PUMP": {
-      "price": 2.47,
-      "change": 0.07245596800000001,
-      "changePct": 2.93344
+      "price": 1590.26,
+      "change": -0.488686898,
+      "changePct": -0.03073
     },
     "CRYPTO:FIL": {
-      "price": 1211.47,
-      "change": 15.736147271,
-      "changePct": 1.29893
+      "price": 1195.86,
+      "change": -15.610038923999998,
+      "changePct": -1.30534
+    },
+    "CRYPTO:PUMP": {
+      "price": 2.32,
+      "change": -0.14850203999999997,
+      "changePct": -6.40095
     },
     "CRYPTO:FLR": {
-      "price": 10.76,
-      "change": 0.599322316,
-      "changePct": 5.56991
-    },
-    "CRYPTO:VVV": {
-      "price": 19429.91,
-      "change": -1704.9823744640003,
-      "changePct": -8.77504
+      "price": 10.6,
+      "change": -0.15424696,
+      "changePct": -1.45516
     },
     "CRYPTO:GHO": {
-      "price": 1526.13,
-      "change": 2.12437296,
-      "changePct": 0.1392
+      "price": 1526.17,
+      "change": 0.096301327,
+      "changePct": 0.00631
     },
     "CRYPTO:XDC": {
-      "price": 43.74,
-      "change": 0.394066782,
-      "changePct": 0.90093
-    },
-    "CRYPTO:USD0": {
-      "price": 1527.26,
-      "change": 1.9014387,
-      "changePct": 0.1245
-    },
-    "CRYPTO:YLDS": {
-      "price": 1529.09,
-      "change": 2.53523122,
-      "changePct": 0.1658
+      "price": 43.65,
+      "change": -0.109635705,
+      "changePct": -0.25117
     },
     "CRYPTO:LIT": {
-      "price": 3353.18,
-      "change": 137.24733399,
-      "changePct": 4.09305
+      "price": 3387.69,
+      "change": 34.301716326,
+      "changePct": 1.01254
+    },
+    "CRYPTO:NIGHT": {
+      "price": 50.97,
+      "change": 1.3694313779999998,
+      "changePct": 2.68674
+    },
+    "CRYPTO:USD0": {
+      "price": 1526.69,
+      "change": -0.567165335,
+      "changePct": -0.03715
+    },
+    "CRYPTO:VVV": {
+      "price": 17869.14,
+      "change": -1417.573171512,
+      "changePct": -7.93308
     }
   },
   "fx": {
