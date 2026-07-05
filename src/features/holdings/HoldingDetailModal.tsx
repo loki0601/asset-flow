@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { X, ArrowUpRight, ArrowDownRight, TrendingUp, TrendingDown } from 'lucide-react';
+import { ArrowUpRight, ArrowDownRight, TrendingUp, TrendingDown } from 'lucide-react';
 import type { HoldingView } from '@/hooks/useHoldingsView';
 import { formatKRW } from '@/lib/loans';
 import { profitLossAmount, profitLossPercent } from '@/lib/holdings';
@@ -10,7 +10,11 @@ import { priceHistoryRepo, type PriceHistoryRow } from '@/lib/priceHistoryRepo';
 import { useCurrentUserId, usePriceSync } from '@/components/AuthProvider';
 import { accountsRepo, familyRepo } from '@/lib/repos';
 import { accountOwnerLabel } from '@/lib/accountLabel';
+import { categoryColor } from '@/lib/categoryColors';
+import { useTheme } from '@/hooks/useTheme';
 import { Modal } from '@/components/Modal';
+import { ModalHeader } from '@/components/ModalHeader';
+import { AssetCategoryIcon } from '@/components/AssetCategoryIcon';
 import { TradeForm, type TradeSide } from '@/features/trade/TradeForm';
 import { assetDisplayName } from '@/lib/assetDisplay';
 import type { Account, FamilyMember } from '@/lib/schema';
@@ -25,29 +29,21 @@ interface Props {
   memberId?: string | 'all';
 }
 
-/** A pending trade: which side, and (when launched from a specific
- *  position/row) which account it must land in. */
-interface PendingTrade {
-  side: TradeSide;
-  accountId?: string;
-  lock: boolean;
-}
-
 export function HoldingDetailModal({ open, onClose, view, memberId = 'all' }: Props) {
-  const [trade, setTrade] = useState<PendingTrade | null>(null);
+  const [tradeSide, setTradeSide] = useState<TradeSide | null>(null);
 
   useEffect(() => {
-    if (open) setTrade(null);
+    if (open) setTradeSide(null);
   }, [open]);
 
   function handleClose() {
-    setTrade(null);
+    setTradeSide(null);
     onClose();
   }
 
   return (
     <Modal open={open} onClose={handleClose}>
-      {trade ? (
+      {tradeSide ? (
         <TradeForm
           asset={{
             symbol: view.holding.symbol,
@@ -56,15 +52,13 @@ export function HoldingDetailModal({ open, onClose, view, memberId = 'all' }: Pr
             currentPrice: view.asset.currentPrice,
             currency: view.asset.currency,
           }}
-          side={trade.side}
-          onBack={() => setTrade(null)}
+          side={tradeSide}
+          onBack={() => setTradeSide(null)}
           onClose={handleClose}
           memberId={memberId}
-          initialAccountId={trade.accountId}
-          lockAccount={trade.lock}
         />
       ) : (
-        <DetailView view={view} onClose={handleClose} onTrade={setTrade} />
+        <DetailView view={view} onClose={handleClose} onTrade={setTradeSide} />
       )}
     </Modal>
   );
@@ -77,10 +71,11 @@ function DetailView({
 }: {
   view: HoldingView;
   onClose: () => void;
-  onTrade: (trade: PendingTrade) => void;
+  onTrade: (side: TradeSide) => void;
 }) {
   const { holding, asset, totalValue, dailyChangePct } = view;
   const userId = useCurrentUserId();
+  const { theme } = useTheme();
 
   // Owner/account context for this position. Aggregated rows (모아보기)
   // carry per-account constituents; single rows resolve their one account.
@@ -97,6 +92,7 @@ function DetailView({
     return accountOwnerLabel(acc, acc ? membersById.get(acc.memberId) : undefined);
   };
   const constituents = view.constituents ?? null;
+  const color = categoryColor(view.category, theme);
   // Daily-change pill mirrors the SYMBOL itself, not the user's
   // position: show the asset's per-share change (전일 대비 가격 변동)
   // not `qty × change`.  The qty-scaled daily P/L still lives in the
@@ -141,24 +137,13 @@ function DetailView({
 
   return (
     <>
-      <div className="flex items-center justify-between px-6 pt-5 pb-2">
-        <div>
-          <span className="text-[10px] font-black text-brand-sage uppercase tracking-widest">
-            {view.category}
-          </span>
-          <h2 className="text-xl font-black text-brand-ink leading-tight">{assetDisplayName(asset)}</h2>
-          <p className="text-[11px] font-bold text-brand-sage mt-0.5 truncate">
-            {constituents ? `${constituents.length}개 계좌 통합` : labelFor(holding.accountId)}
-          </p>
-        </div>
-        <button
-          onClick={onClose}
-          className="w-9 h-9 rounded-full bg-brand-surface flex items-center justify-center text-brand-sage"
-          aria-label="닫기"
-        >
-          <X size={18} />
-        </button>
-      </div>
+      <ModalHeader
+        icon={<AssetCategoryIcon asset={asset} color={color} size={40} />}
+        eyebrow={view.category}
+        title={assetDisplayName(asset)}
+        subtitle={constituents ? `${constituents.length}개 계좌 통합` : labelFor(holding.accountId)}
+        onClose={onClose}
+      />
 
       <div className="px-6 py-4">
         <p className="text-3xl font-black text-brand-ink tracking-tight">
@@ -211,64 +196,44 @@ function DetailView({
         </div>
       </div>
 
-      {constituents ? (
-        // Aggregated (모아보기) row: per-account breakdown, each tradable
-        // against ITS OWN account. The old single 매수/매도 pair silently
-        // traded the first account — selling now always names its target.
-        <div className="px-5 py-4 border-t border-gray-100 space-y-2">
-          <p className="text-[10px] font-black text-brand-sage uppercase tracking-widest px-1">
+      {constituents && (
+        // Aggregated (모아보기) row: read-only per-account breakdown — a
+        // simple divided list, no per-row actions. Buy/sell always go
+        // through the common CTA below, where 소유주/계좌 are picked
+        // explicitly on the trade form (no more silent first-account default).
+        <div className="px-6 py-4 border-t border-gray-100">
+          <p className="text-[10px] font-black text-brand-sage uppercase tracking-widest mb-2">
             계좌별 보유
           </p>
-          {constituents.map((c) => (
-            <div
-              key={c.holding.id}
-              className="flex items-center gap-3 bg-brand-surface/70 rounded-2xl px-4 py-3"
-            >
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-black text-brand-ink truncate">
+          <div className="divide-y divide-gray-100">
+            {constituents.map((c) => (
+              <div key={c.holding.id} className="flex items-center justify-between py-2.5">
+                <p className="text-xs font-bold text-brand-ink truncate">
                   {labelFor(c.holding.accountId)}
                 </p>
-                <p className="text-[11px] font-bold text-brand-sage">
+                <p className="text-xs font-bold text-brand-sage shrink-0 tabular-nums">
                   {formatQty(c.holding.quantity, view.category)} · {formatKRW(c.totalValue)}
                 </p>
               </div>
-              <button
-                onClick={() => onTrade({ side: 'buy', accountId: c.holding.accountId, lock: true })}
-                className="shrink-0 px-3 py-2 rounded-xl text-[11px] font-black text-white bg-brand-up"
-              >
-                매수
-              </button>
-              <button
-                onClick={() => onTrade({ side: 'sell', accountId: c.holding.accountId, lock: true })}
-                className="shrink-0 px-3 py-2 rounded-xl text-[11px] font-black text-white bg-brand-down"
-              >
-                매도
-              </button>
-            </div>
-          ))}
-          <button
-            onClick={() => onTrade({ side: 'buy', lock: false })}
-            className="w-full bg-brand-up text-white rounded-2xl py-3.5 flex items-center justify-center gap-1.5 font-black text-sm shadow-md shadow-brand-up/20"
-          >
-            <TrendingUp size={16} /> 다른 계좌에 매수
-          </button>
-        </div>
-      ) : (
-        <div className="px-5 py-4 grid grid-cols-2 gap-3 border-t border-gray-100">
-          <button
-            onClick={() => onTrade({ side: 'buy', accountId: holding.accountId, lock: false })}
-            className="bg-brand-up text-white rounded-2xl py-3.5 flex items-center justify-center gap-1.5 font-black text-sm shadow-md shadow-brand-up/20"
-          >
-            <TrendingUp size={16} /> 매수
-          </button>
-          <button
-            onClick={() => onTrade({ side: 'sell', accountId: holding.accountId, lock: true })}
-            className="bg-brand-down text-white rounded-2xl py-3.5 flex items-center justify-center gap-1.5 font-black text-sm shadow-md shadow-brand-down/20"
-          >
-            <TrendingDown size={16} /> 매도
-          </button>
+            ))}
+          </div>
         </div>
       )}
+
+      <div className="px-5 py-4 grid grid-cols-2 gap-3 border-t border-gray-100">
+        <button
+          onClick={() => onTrade('buy')}
+          className="bg-brand-up text-white rounded-2xl py-3.5 flex items-center justify-center gap-1.5 font-black text-sm shadow-md shadow-brand-up/20"
+        >
+          <TrendingUp size={16} /> 매수
+        </button>
+        <button
+          onClick={() => onTrade('sell')}
+          className="bg-brand-down text-white rounded-2xl py-3.5 flex items-center justify-center gap-1.5 font-black text-sm shadow-md shadow-brand-down/20"
+        >
+          <TrendingDown size={16} /> 매도
+        </button>
+      </div>
     </>
   );
 }

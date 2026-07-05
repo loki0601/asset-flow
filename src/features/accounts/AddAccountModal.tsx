@@ -1,10 +1,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { X, CreditCard, ChevronDown } from 'lucide-react';
+import { CreditCard, ChevronDown } from 'lucide-react';
 import type { FamilyMember } from '@/lib/schema';
 import { INSTITUTIONS, type InstitutionKind } from '@/lib/institutions';
 import { Modal } from '@/components/Modal';
+import { ModalHeader } from '@/components/ModalHeader';
 
 export interface AddAccountInput {
   memberId: string;
@@ -56,21 +57,15 @@ export function AddAccountModal({ open, onClose, members, onSubmit }: Props) {
 
   return (
     <Modal open={open} onClose={onClose}>
-      <div className="flex items-center justify-between px-6 pt-5 pb-3">
-        <div className="flex items-center gap-2">
-          <div className="w-9 h-9 rounded-2xl bg-brand-surface text-brand flex items-center justify-center">
-            <CreditCard size={18} />
+      <ModalHeader
+        icon={
+          <div className="w-10 h-10 rounded-2xl bg-brand-surface text-brand flex items-center justify-center shrink-0">
+            <CreditCard size={20} />
           </div>
-          <h2 className="text-lg font-black text-brand-ink">계좌 추가</h2>
-        </div>
-        <button
-          onClick={onClose}
-          className="w-9 h-9 rounded-full bg-brand-surface text-brand-sage flex items-center justify-center"
-          aria-label="닫기"
-        >
-          <X size={18} />
-        </button>
-      </div>
+        }
+        title="계좌 추가"
+        onClose={onClose}
+      />
 
       <form onSubmit={handleSubmit} className="px-6 pb-6 space-y-4">
         <Field label="소유자">

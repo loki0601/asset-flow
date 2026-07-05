@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { CircleUser, ChevronRight, CreditCard, HandCoins, HeartPulse, Trash2, Users, X } from 'lucide-react';
+import { CircleUser, ChevronRight, CreditCard, HandCoins, HeartPulse, Trash2, Users } from 'lucide-react';
 import { ToggleRow } from '@/features/settings/ToggleRow';
 import { setAggregateView } from '@/lib/userSettings';
 import { useAggregateView } from '@/hooks/useAggregateView';
@@ -17,6 +17,7 @@ import { useCurrentUserId, useSignOut } from '@/components/AuthProvider';
 import { listUsers } from '@/lib/auth';
 import { familyRepo } from '@/lib/repos';
 import { Modal } from '@/components/Modal';
+import { ModalHeader } from '@/components/ModalHeader';
 import { ConfirmModal } from '@/components/ConfirmModal';
 
 const APP_VERSION = '0.1.0';
@@ -266,21 +267,15 @@ function NeedMemberModal({ open, onClose }: { open: boolean; onClose: () => void
 
   return (
     <Modal open={open} onClose={onClose}>
-      <div className="flex items-center justify-between px-6 pt-5 pb-3">
-        <div className="flex items-center gap-2">
-          <div className="w-9 h-9 rounded-2xl bg-brand-surface text-brand flex items-center justify-center">
-            <Users size={18} />
+      <ModalHeader
+        icon={
+          <div className="w-10 h-10 rounded-2xl bg-brand-surface text-brand flex items-center justify-center shrink-0">
+            <Users size={20} />
           </div>
-          <h2 className="text-lg font-black text-brand-ink">구성원이 필요해요</h2>
-        </div>
-        <button
-          onClick={onClose}
-          className="w-9 h-9 rounded-full bg-brand-surface text-brand-sage flex items-center justify-center"
-          aria-label="닫기"
-        >
-          <X size={18} />
-        </button>
-      </div>
+        }
+        title="구성원이 필요해요"
+        onClose={onClose}
+      />
       <div className="px-6 pb-6">
         <p className="text-sm text-brand-ink/80 mb-5 leading-relaxed">
           계좌·대출·노후 정보는 구성원 단위로 관리됩니다. 먼저 구성원을 한 명 이상 등록해 주세요.

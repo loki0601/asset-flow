@@ -1,10 +1,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { X } from 'lucide-react';
+import { CreditCard } from 'lucide-react';
 import type { Loan } from '@/lib/schema';
 import { formatKRW, loanProgressRatio, currentLoanBalance, currentMonthlyPayment } from '@/lib/loans';
 import { Modal } from '@/components/Modal';
+import { ModalHeader } from '@/components/ModalHeader';
 
 interface Props {
   open: boolean;
@@ -48,21 +49,16 @@ export function LoanDetailModal({ open, onClose, loan, onRepay }: Props) {
 
   return (
     <Modal open={open} onClose={onClose}>
-      <div className="flex items-center justify-between px-6 pt-5 pb-2">
-        <div>
-          <span className="text-[10px] font-black text-brand-sage uppercase tracking-widest">
-            {loan.bank}
-          </span>
-          <h2 className="text-xl font-black text-brand-ink leading-tight">{loan.name}</h2>
-        </div>
-        <button
-          onClick={onClose}
-          className="w-9 h-9 rounded-full bg-brand-surface flex items-center justify-center text-brand-sage"
-          aria-label="닫기"
-        >
-          <X size={18} />
-        </button>
-      </div>
+      <ModalHeader
+        icon={
+          <div className="w-10 h-10 rounded-2xl bg-brand-surface text-brand flex items-center justify-center shrink-0">
+            <CreditCard size={20} />
+          </div>
+        }
+        eyebrow={loan.bank}
+        title={loan.name}
+        onClose={onClose}
+      />
 
       <div className="px-6 py-4">
         <p className="text-[10px] text-gray-400 font-bold uppercase mb-1">Remaining Balance</p>

@@ -1,8 +1,9 @@
 'use client';
 
-import { X, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import { ArrowUpRight, ArrowDownRight } from 'lucide-react';
 import type { MarketAsset, Transaction } from '@/lib/schema';
 import { Modal } from '@/components/Modal';
+import { ModalHeader } from '@/components/ModalHeader';
 import { AssetCategoryIcon } from '@/components/AssetCategoryIcon';
 import { assetDisplayName } from '@/lib/assetDisplay';
 import { categoryColor } from '@/lib/categoryColors';
@@ -37,33 +38,23 @@ export function TradeDetailModal({ open, onClose, tx, asset, accountLabel, dateL
 
   return (
     <Modal open={open} onClose={onClose}>
-      <div className="flex items-center justify-between px-6 pt-5 pb-2">
-        <div className="flex items-center gap-3 min-w-0">
-          <AssetCategoryIcon asset={asset} color={color} size={40} />
-          <div className="min-w-0">
-            <div className="flex items-center gap-1.5">
-              <h2 className="text-lg font-black text-brand-ink leading-tight truncate">
-                {assetDisplayName(asset)}
-              </h2>
-              <span
-                className={`shrink-0 text-[9px] font-black px-1.5 py-0.5 rounded-md ${
-                  isBuy ? 'bg-brand-up/10 text-brand-up' : 'bg-brand-down/10 text-brand-down'
-                }`}
-              >
-                {isBuy ? '매수' : '매도'}
-              </span>
-            </div>
-            <p className="text-[11px] font-bold text-brand-sage truncate mt-0.5">{dateLabel}</p>
-          </div>
-        </div>
-        <button
-          onClick={onClose}
-          className="w-9 h-9 rounded-full bg-brand-surface flex items-center justify-center text-brand-sage shrink-0"
-          aria-label="닫기"
-        >
-          <X size={18} />
-        </button>
-      </div>
+      <ModalHeader
+        icon={<AssetCategoryIcon asset={asset} color={color} size={40} />}
+        title={
+          <span className="inline-flex items-center gap-1.5">
+            {assetDisplayName(asset)}
+            <span
+              className={`shrink-0 text-[9px] font-black px-1.5 py-0.5 rounded-md ${
+                isBuy ? 'bg-brand-up/10 text-brand-up' : 'bg-brand-down/10 text-brand-down'
+              }`}
+            >
+              {isBuy ? '매수' : '매도'}
+            </span>
+          </span>
+        }
+        subtitle={dateLabel}
+        onClose={onClose}
+      />
 
       <div className="px-6 py-4">
         <p

@@ -2,7 +2,7 @@
 
 import { useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { X, Search, ChevronRight, CreditCard } from 'lucide-react';
+import { Search, ChevronRight, CreditCard } from 'lucide-react';
 import { ACCOUNT_TYPES, type AssetCategory, type MarketAsset } from '@/lib/schema';
 import { listMarketAssets } from '@/lib/market';
 import { accountsRepo, holdingsRepo } from '@/lib/repos';
@@ -12,6 +12,7 @@ import { assetDisplayName } from '@/lib/assetDisplay';
 import { categoryColor } from '@/lib/categoryColors';
 import { searchAssets } from '@/lib/assetSearch';
 import { Modal } from '@/components/Modal';
+import { ModalHeader } from '@/components/ModalHeader';
 import { AssetCategoryIcon } from '@/components/AssetCategoryIcon';
 import { TradeForm } from '@/features/trade/TradeForm';
 import { useCurrentUserId, useMarketDataKey } from '@/components/AuthProvider';
@@ -168,18 +169,7 @@ function NoSupportingAccountView({
 
   return (
     <div className="flex flex-col">
-      <div className="flex items-center justify-between px-6 pt-5 pb-3">
-        <button
-          type="button"
-          onClick={onBack}
-          className="w-9 h-9 rounded-full bg-brand-surface text-brand-sage flex items-center justify-center"
-          aria-label="뒤로"
-        >
-          <X size={18} />
-        </button>
-        <h2 className="text-lg font-black text-brand-ink">계좌가 필요해요</h2>
-        <span className="w-9 h-9" />
-      </div>
+      <ModalHeader title="계좌가 필요해요" onBack={onBack} onClose={onClose} />
       <div className="px-6 pb-6 space-y-5">
         <div className="w-14 h-14 rounded-2xl bg-brand-surface text-brand flex items-center justify-center mx-auto">
           <CreditCard size={26} />
@@ -240,15 +230,8 @@ function PickerView({
   const { theme } = useTheme();
   return (
     <div className="flex flex-col flex-1 min-h-0">
-      <div className="flex items-center justify-between px-6 pt-5 pb-3 shrink-0">
-        <h2 className="text-lg font-black text-brand-ink">매수할 종목 선택</h2>
-        <button
-          onClick={onClose}
-          className="w-9 h-9 rounded-full bg-brand-surface text-brand-sage flex items-center justify-center"
-          aria-label="닫기"
-        >
-          <X size={18} />
-        </button>
+      <div className="shrink-0">
+        <ModalHeader title="매수할 종목 선택" onClose={onClose} />
       </div>
 
       <div className="px-6 pb-3 shrink-0">

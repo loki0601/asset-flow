@@ -2,22 +2,16 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { createId } from '@paralleldrive/cuid2';
-import {
-  X,
-  ChevronLeft,
-  ChevronDown,
-  TrendingUp,
-  TrendingDown,
-} from 'lucide-react';
+import { ChevronDown, TrendingUp, TrendingDown } from 'lucide-react';
 import type { Account, AssetCategory, FamilyMember, Holding, Transaction } from '@/lib/schema';
 import { accountsRepo, familyRepo, holdingsRepo, transactionsRepo } from '@/lib/repos';
 import { institutionSupports } from '@/lib/institutions';
 import { formatPrice, type PriceCurrency } from '@/lib/loans';
 import { valuationAmount, validateTradeInput } from '@/lib/holdings';
 import { applyBuy, applySell, formatPriceInput, preferredAccountId } from '@/lib/trade';
-import { accountOwnerLabel } from '@/lib/accountLabel';
 import { trackSymbolHistory } from '@/lib/prices';
 import { useCurrentUserId } from '@/components/AuthProvider';
+import { ModalHeader } from '@/components/ModalHeader';
 
 export type TradeSide = 'buy' | 'sell';
 
@@ -42,29 +36,13 @@ interface Props {
    *  one member's holdings, the buy/sell dialog only offers that
    *  member's accounts. */
   memberId?: string | 'all';
-  /** Pre-select this account (e.g. the account of the card the user
-   *  tapped). Falls back to preferredAccountId when absent/invalid. */
-  initialAccountId?: string;
-  /** Render the account as a fixed read-only line instead of a dropdown.
-   *  Used when the trade targets a SPECIFIC position (sell from a card,
-   *  per-account row in the aggregate detail) — prevents the order from
-   *  silently landing in a different account. Ignored unless
-   *  initialAccountId resolves to a valid candidate account. */
-  lockAccount?: boolean;
 }
 
-export function TradeForm({
-  asset,
-  side,
-  onBack,
-  onClose,
-  memberId = 'all',
-  initialAccountId,
-  lockAccount = false,
-}: Props) {
+export function TradeForm({ asset, side, onBack, onClose, memberId = 'all' }: Props) {
   const userId = useCurrentUserId();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [members, setMembers] = useState<FamilyMember[]>([]);
+  const [ownerId, setOwnerId] = useState<string | null>(null);
   const [accountId, setAccountId] = useState<string | null>(null);
   const [priceStr, setPriceStr] = useState('');
   const [qtyStr, setQtyStr] = useState('');
@@ -80,40 +58,36 @@ export function TradeForm({
       .filter((a) => memberId === 'all' || a.memberId === memberId);
     setAccounts(accs);
     setMembers(familyRepo.list(userId));
-    // A caller-supplied account (the card/row the user tapped) wins over
-    // the heuristic default; otherwise prefer an account that already
-    // holds this symbol so the dialog defaults to where the position
-    // lives. With multiple held accounts the first in dropdown order
-    // wins; with none, fall back to the first candidate.
-    const initialValid =
-      initialAccountId && accs.some((a) => a.id === initialAccountId)
-        ? initialAccountId
-        : null;
-    const preferred =
-      initialValid ?? preferredAccountId(accs, holdingsRepo.list(userId), asset.symbol);
+    // Default to an account that already holds this symbol — almost always
+    // where the user intends to trade. Owner defaults to that account's
+    // owner; both remain independently editable via their own selects.
+    const preferred = preferredAccountId(accs, holdingsRepo.list(userId), asset.symbol);
     setAccountId((prev) => prev ?? preferred);
+    setOwnerId((prev) => prev ?? accs.find((a) => a.id === preferred)?.memberId ?? null);
     // Reset date to today each time the form is mounted (e.g. new picker open)
     setDateStr(todayISODate());
-  }, [userId, asset.category, asset.symbol, memberId, initialAccountId]);
+  }, [userId, asset.category, asset.symbol, memberId]);
 
   // priceStr stays user-controlled; the current price is shown via placeholder
   // only, not pre-filled, so the user explicitly enters their fill price.
 
-  const membersById = useMemo(
-    () => Object.fromEntries(members.map((m) => [m.id, m] as const)),
-    [members],
+  // Owners with at least one candidate account, in family-list order.
+  const owners = useMemo(() => {
+    const ids = new Set(accounts.map((a) => a.memberId));
+    return members.filter((m) => ids.has(m.id));
+  }, [accounts, members]);
+
+  // Accounts belonging to the selected owner — the 계좌 select narrows to
+  // these so 소유주/계좌 read as one dependent pair, not two independent lists.
+  const accountsForOwner = useMemo(
+    () => accounts.filter((a) => a.memberId === ownerId),
+    [accounts, ownerId],
   );
 
-  // Resolved account for the locked (read-only) display. Null when the
-  // caller-supplied account isn't a valid candidate — the dropdown then
-  // renders as usual so the user can still pick.
-  const lockedAccount = useMemo(
-    () =>
-      lockAccount && initialAccountId
-        ? accounts.find((a) => a.id === initialAccountId) ?? null
-        : null,
-    [lockAccount, initialAccountId, accounts],
-  );
+  function handleOwnerChange(id: string) {
+    setOwnerId(id);
+    setAccountId(accounts.find((a) => a.memberId === id)?.id ?? null);
+  }
 
   const price = Number(priceStr.replaceAll(',', ''));
   const qty = Number(qtyStr);
@@ -123,6 +97,11 @@ export function TradeForm({
   const isBuy = side === 'buy';
   const sideLabel = isBuy ? '매수' : '매도';
   const accentBg = isBuy ? 'bg-brand-up' : 'bg-brand-down';
+  const sideIcon = (
+    <div className={`w-10 h-10 rounded-2xl flex items-center justify-center text-white shrink-0 ${accentBg}`}>
+      {isBuy ? <TrendingUp size={20} /> : <TrendingDown size={20} />}
+    </div>
+  );
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -198,20 +177,7 @@ export function TradeForm({
   if (submitted) {
     return (
       <>
-        <div className="flex items-center justify-between px-6 pt-5 pb-3">
-          <div className="flex items-center gap-2">
-            <div className={`w-9 h-9 rounded-2xl flex items-center justify-center text-white ${accentBg}`}>
-              {isBuy ? <TrendingUp size={18} /> : <TrendingDown size={18} />}
-            </div>
-            <h2 className="text-lg font-black text-brand-ink">{sideLabel} 주문 접수</h2>
-          </div>
-          <button
-            onClick={onClose}
-            className="w-9 h-9 rounded-full bg-brand-surface text-brand-sage flex items-center justify-center"
-          >
-            <X size={18} />
-          </button>
-        </div>
+        <ModalHeader icon={sideIcon} title={`${sideLabel} 주문 접수`} onClose={onClose} />
         <div className="px-6 py-8 text-center">
           <p className={`text-[10px] font-black uppercase tracking-widest mb-2 ${isBuy ? 'text-brand-up' : 'text-brand-down'}`}>
             {sideLabel} 완료
@@ -231,68 +197,62 @@ export function TradeForm({
 
   return (
     <>
-      <div className="flex items-center justify-between px-6 pt-5 pb-3">
-        <div className="flex items-center gap-2 min-w-0">
-          <button
-            onClick={onBack}
-            className="w-9 h-9 rounded-full bg-brand-surface text-brand-sage flex items-center justify-center shrink-0"
-            aria-label="뒤로"
-          >
-            <ChevronLeft size={18} />
-          </button>
-          <div className={`w-9 h-9 rounded-2xl flex items-center justify-center text-white shrink-0 ${accentBg}`}>
-            {isBuy ? <TrendingUp size={18} /> : <TrendingDown size={18} />}
-          </div>
-          <div className="min-w-0">
-            <h2 className="text-base font-black text-brand-ink leading-tight line-clamp-2">
-              {asset.name} {sideLabel}
-            </h2>
-            <p className="text-[10px] text-brand-sage font-bold uppercase tracking-widest truncate mt-0.5">
-              {asset.category} · 현재가 {formatPrice(asset.currentPrice, asset.currency)}
-            </p>
-          </div>
-        </div>
-        <button
-          onClick={onClose}
-          className="w-9 h-9 rounded-full bg-brand-surface text-brand-sage flex items-center justify-center shrink-0"
-          aria-label="닫기"
-        >
-          <X size={18} />
-        </button>
-      </div>
+      <ModalHeader
+        icon={sideIcon}
+        title={`${asset.name} ${sideLabel}`}
+        subtitle={`${asset.category} · 현재가 ${formatPrice(asset.currentPrice, asset.currency)}`}
+        onBack={onBack}
+        onClose={onClose}
+      />
 
       <form onSubmit={handleSubmit} className="px-6 pb-6 space-y-4">
-        <Field label="계좌 선택">
-          {accounts.length === 0 ? (
-            <p className="text-xs font-bold text-rose-500 px-1">
-              이 카테고리를 보유할 수 있는 계좌가 없어요. 설정에서 추가하세요.
-            </p>
-          ) : lockAccount && lockedAccount ? (
-            // Trade targets a specific position — show the account as a
-            // fixed line so the order can't silently land elsewhere.
-            <div className="w-full bg-brand-surface px-4 py-3 rounded-2xl text-sm font-bold text-brand-ink truncate">
-              {accountOwnerLabel(lockedAccount, members.find((m) => m.id === lockedAccount.memberId))}
-            </div>
-          ) : (
-            <div className="relative">
-              <select
-                value={accountId ?? ''}
-                onChange={(e) => setAccountId(e.target.value)}
-                className="w-full appearance-none bg-brand-surface px-4 py-3 pr-10 rounded-2xl text-sm font-bold text-brand-ink focus:outline-none truncate"
-              >
-                {accounts.map((acc) => (
-                  <option key={acc.id} value={acc.id}>
-                    {membersById[acc.memberId]?.name ?? '?'} · {acc.institution} · {acc.name}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown
-                size={16}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-brand-sage pointer-events-none"
-              />
-            </div>
-          )}
-        </Field>
+        {accounts.length === 0 ? (
+          <p className="text-xs font-bold text-rose-500 px-1">
+            이 카테고리를 보유할 수 있는 계좌가 없어요. 설정에서 추가하세요.
+          </p>
+        ) : (
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="소유주">
+              <div className="relative">
+                <select
+                  value={ownerId ?? ''}
+                  onChange={(e) => handleOwnerChange(e.target.value)}
+                  className="w-full appearance-none bg-brand-surface px-4 py-3 pr-9 rounded-2xl text-sm font-bold text-brand-ink focus:outline-none truncate"
+                >
+                  {owners.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.name}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown
+                  size={16}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-brand-sage pointer-events-none"
+                />
+              </div>
+            </Field>
+
+            <Field label="계좌">
+              <div className="relative">
+                <select
+                  value={accountId ?? ''}
+                  onChange={(e) => setAccountId(e.target.value)}
+                  className="w-full appearance-none bg-brand-surface px-4 py-3 pr-9 rounded-2xl text-sm font-bold text-brand-ink focus:outline-none truncate"
+                >
+                  {accountsForOwner.map((acc) => (
+                    <option key={acc.id} value={acc.id}>
+                      {acc.institution} · {acc.name}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown
+                  size={16}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-brand-sage pointer-events-none"
+                />
+              </div>
+            </Field>
+          </div>
+        )}
 
         <Field label="주문 가격 (1주)">
           <div className="relative">
