@@ -40,6 +40,7 @@ export function TradeDetailModal({ open, onClose, tx, asset, accountLabel, dateL
     <Modal open={open} onClose={onClose}>
       <ModalHeader
         icon={<AssetCategoryIcon asset={asset} color={color} size={40} />}
+        eyebrow={asset.category}
         title={
           <span className="inline-flex items-center gap-1.5">
             {assetDisplayName(asset)}
@@ -52,7 +53,7 @@ export function TradeDetailModal({ open, onClose, tx, asset, accountLabel, dateL
             </span>
           </span>
         }
-        subtitle={dateLabel}
+        subtitle={accountLabel}
         onClose={onClose}
       />
 
@@ -77,7 +78,7 @@ export function TradeDetailModal({ open, onClose, tx, asset, accountLabel, dateL
               {Math.abs(pnl.pct).toFixed(1)}%
             </span>
           )}
-          <span className="text-[11px] font-medium text-gray-400">{accountLabel}</span>
+          <span className="text-[11px] font-medium text-gray-400">{dateLabel}</span>
         </div>
       </div>
 
