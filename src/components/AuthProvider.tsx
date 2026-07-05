@@ -163,13 +163,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // When the app comes back to foreground, check for any pending native-side
   // sync the FirebaseMessagingService left behind while we were dead, then
-  // pull fresh prices (5-min cooldown) — resume used to rely entirely on
-  // FCM/native prefetch, so a failed push meant silently stale prices until
-  // a manual tap or cold restart.
+  // pull fresh prices (1-hour cooldown; automatic syncs stay ~hourly per
+  // user request to protect upstream API limits — the manual 시세 동기화
+  // button has no cooldown). Resume used to rely entirely on FCM/native
+  // prefetch, so a failed push meant silently stale prices until a manual
+  // tap or cold restart.
   // Also flush any debounced persistDb writes when the app goes hidden,
   // since the WebView process may be killed without firing microtasks.
   useEffect(() => {
-    const RESUME_COOLDOWN_MS = 5 * 60 * 1000;
+    const RESUME_COOLDOWN_MS = 60 * 60 * 1000;
     const handler = () => {
       if (document.visibilityState === 'hidden') {
         flushPersistDb();
@@ -194,14 +196,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [refreshPrices]);
 
   // In-session live polling: while the app is visible and at least one held
-  // symbol's market is open, overlay live ticks every 60s. Without this the
+  // symbol's market is open, overlay live ticks hourly. Without this the
   // live overlay ran only once at boot, so a screen left open during market
-  // hours never moved. anyLiveWindow gates the request so a KRX-only
-  // portfolio doesn't hit the server all night.
+  // hours never moved. Hourly (not faster) per user request — the upstream
+  // quote APIs are rate-limited; anyone needing fresher numbers taps the
+  // manual 시세 동기화 button. anyLiveWindow gates the request so a
+  // KRX-only portfolio doesn't hit the server all night.
   useEffect(() => {
     if (!state.userId) return;
     const userId = state.userId;
-    const LIVE_POLL_MS = 60 * 1000;
+    const LIVE_POLL_MS = 60 * 60 * 1000;
     const id = setInterval(() => {
       if (document.visibilityState !== 'visible') return;
       const heldSymbols = Array.from(new Set(holdingsRepo.list(userId).map((h) => h.symbol)));

@@ -46,14 +46,15 @@
 
 ### 4.1 모든 코드 수정은 production 외부 배포까지 반영해야 한다
 
-dev 서버(`pnpm dev`)는 개발 중에만 사용하고, 사용자가 외부에서 보는 결과는 **항상 production 서버**가 서빙해야 한다. 코드 수정이 끝나면 무조건 다음 순서를 실행한다:
+production 서버는 **launchd 잡 `com.assetflow.web`이 관리**한다 (KeepAlive — 프로세스를 죽이면 launchd가 즉시 재기동한다). 절대 `kill` + `pnpm start`로 수동 재시작하지 말 것. 코드 수정이 끝나면 무조건 다음 순서를 실행한다:
 
 1. `pnpm typecheck && pnpm test` 통과 확인
-2. 현재 실행 중인 production/dev 서버 중단
-3. `pnpm build` (production 빌드)
-4. `pnpm start` (백그라운드 실행)
-5. `curl -s -o /dev/null -w "%{http_code}\n" https://assetflow.elkavio.com/<해당 페이지>`로 200 확인 + 변경된 컨텐츠가 응답에 포함되는지 grep으로 확인
-6. 텔레그램으로 사용자에게 반영 완료 보고
+2. `pnpm build` (production 빌드) — **서버를 중단하지 않고 그대로 빌드한다.** build-and-preserve가 이전 청크를 보존하므로 돌아가는 구 서버는 빌드 중에도 일관되게 서빙된다.
+3. `launchctl kickstart -k gui/501/com.assetflow.web` — 빌드 **완료 후** 재시작
+4. 검증: `curl -s https://assetflow.elkavio.com/login`에서 참조하는 `/_next/static/chunks/*.js` 경로를 추출해 각각 200인지 확인 (공개 파일·API 200만으로는 부족 — 구 서버도 public/과 prices.json은 최신으로 서빙하므로 착각하기 쉽다)
+5. 텔레그램으로 사용자에게 반영 완료 보고
+
+**서버를 먼저 죽이면 안 되는 이유(실제 장애)**: 빌드 전에 kill → launchd가 빌드 도중 재기동 → 반쯤 쓰인 `.next`를 로드 → 기기에서 부팅이 깨져 "로그인 안 되고 데이터가 안 보이는" 상태가 됐다 (2026-07-05).
 
 dev 서버만 띄워둔 상태로 작업을 끝내면 사용자가 "수정해도 외부에 반영이 안 된다"고 한다 — 이건 dev/prod 차이가 아니라 빌드가 안 됐기 때문이다.
 
