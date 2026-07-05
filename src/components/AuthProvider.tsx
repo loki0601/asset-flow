@@ -12,6 +12,7 @@ import {
   flushPersistDb,
   initDb,
   migrateAccountTypeRenames,
+  migrateDuplicateHoldings,
   migrateLegacyLocalStorage,
   migrateLoki0601MemberName,
   SqliteKvStore,
@@ -231,6 +232,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await initDb();
         migrateLegacyLocalStorage();
         migrateAccountTypeRenames();
+        migrateDuplicateHoldings();
         migrateLoki0601MemberName();
         setStorage(new SqliteKvStore());
         // Theme preference may live in kv (persisted in the user DB

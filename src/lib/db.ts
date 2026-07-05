@@ -330,6 +330,7 @@ export function kvRemove(key: string): void {
 // ─── KeyValueStore implementation backed by sql.js ─────────────────────
 
 import type { KeyValueStore } from '@/lib/storage';
+import { mergeDuplicateHoldings } from '@/lib/holdings';
 
 export class SqliteKvStore implements KeyValueStore {
   getItem(key: string): string | null {
@@ -401,6 +402,45 @@ export function migrateAccountTypeRenames(): void {
     }
   }
   persistDb();
+}
+
+/**
+ * Repair Holding rows that violate the app's (accountId, symbol) uniqueness
+ * assumption — a data-seeding bug produced one row per purchase lot instead
+ * of one accumulated row, so a later real buy/sell (whose lookup uses
+ * `.find()`) only ever touched the first duplicate, permanently orphaning
+ * its sibling and double-counting the position in the "계좌별 보유"
+ * breakdown. Idempotent — a user with no duplicates is untouched, so no
+ * migration-flag bookkeeping is needed (matches migrateAccountTypeRenames).
+ */
+export function migrateDuplicateHoldings(): void {
+  if (!db) return;
+  const rows = db.exec("SELECT key, value FROM kv WHERE key LIKE 'assetflow:user:%:holdings'");
+  if (!rows.length) return;
+  let changedAny = false;
+  for (const [key, value] of rows[0].values) {
+    if (typeof value !== 'string') continue;
+    try {
+      const holdings = JSON.parse(value) as Array<{
+        accountId: string;
+        symbol: string;
+        quantity: number;
+        avgPrice: number;
+        createdAt: string;
+      }>;
+      const merged = mergeDuplicateHoldings(holdings);
+      if (merged.length !== holdings.length) {
+        db.run(
+          'INSERT INTO kv (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
+          [key as string, JSON.stringify(merged)],
+        );
+        changedAny = true;
+      }
+    } catch {
+      /* skip malformed */
+    }
+  }
+  if (changedAny) persistDb();
 }
 
 /**

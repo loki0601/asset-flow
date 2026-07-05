@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+  mergeDuplicateHoldings,
   profitLossAmount,
   profitLossPercent,
   valuationAmount,
@@ -73,5 +74,83 @@ describe('validateTradeInput', () => {
         reason: 'quantity-required',
       });
     }
+  });
+});
+
+describe('mergeDuplicateHoldings', () => {
+  // Regression: a data-seeding bug produced MULTIPLE Holding rows for the
+  // same (accountId, symbol) pair — e.g. one row per purchase lot — instead
+  // of one row with quantity/avgPrice accumulated via applyBuy(). The app
+  // assumes (accountId, symbol) is unique (TradeForm's `existing` lookup
+  // uses .find(), so a later real buy only updated the FIRST duplicate,
+  // permanently orphaning its sibling). The aggregated "계좌별 보유" list
+  // then showed the same account twice for one symbol.
+  const h = (over: Partial<import('@/lib/schema').Holding>): import('@/lib/schema').Holding => ({
+    id: over.id ?? 'h',
+    userId: 'u1',
+    accountId: 'a1',
+    symbol: 'KRX:133690',
+    quantity: 1,
+    avgPrice: 100,
+    createdAt: '2025-01-01T00:00:00.000Z',
+    updatedAt: '2025-01-01T00:00:00.000Z',
+    ...over,
+  });
+
+  it('leaves holdings with no duplicates untouched', () => {
+    const input = [h({ id: 'h1', accountId: 'a1', symbol: 'X' }), h({ id: 'h2', accountId: 'a2', symbol: 'X' })];
+    expect(mergeDuplicateHoldings(input)).toEqual(input);
+  });
+
+  it('sums quantity and volume-weights avgPrice for a duplicate pair', () => {
+    const input = [
+      h({ id: 'h1', quantity: 13, avgPrice: 191015, createdAt: '2025-05-13T00:00:00.000Z' }),
+      h({ id: 'h2', quantity: 12, avgPrice: 163015, createdAt: '2025-03-13T00:00:00.000Z' }),
+    ];
+    const out = mergeDuplicateHoldings(input);
+    expect(out).toHaveLength(1);
+    expect(out[0].quantity).toBe(25);
+    expect(out[0].avgPrice).toBeCloseTo((13 * 191015 + 12 * 163015) / 25);
+  });
+
+  it('keeps the earliest-created row\'s id/createdAt for the merged result', () => {
+    const input = [
+      h({ id: 'later', quantity: 1, avgPrice: 100, createdAt: '2025-05-13T00:00:00.000Z' }),
+      h({ id: 'earliest', quantity: 1, avgPrice: 100, createdAt: '2025-03-13T00:00:00.000Z' }),
+    ];
+    const out = mergeDuplicateHoldings(input);
+    expect(out[0].id).toBe('earliest');
+    expect(out[0].createdAt).toBe('2025-03-13T00:00:00.000Z');
+  });
+
+  it('handles 3+ duplicate rows for the same (accountId, symbol)', () => {
+    const input = [
+      h({ id: 'h1', quantity: 10, avgPrice: 100 }),
+      h({ id: 'h2', quantity: 20, avgPrice: 200 }),
+      h({ id: 'h3', quantity: 30, avgPrice: 300 }),
+    ];
+    const out = mergeDuplicateHoldings(input);
+    expect(out).toHaveLength(1);
+    expect(out[0].quantity).toBe(60);
+    expect(out[0].avgPrice).toBeCloseTo((10 * 100 + 20 * 200 + 30 * 300) / 60);
+  });
+
+  it('merges independently per (accountId, symbol) group, leaving others alone', () => {
+    const input = [
+      h({ id: 'h1', accountId: 'a1', symbol: 'X', quantity: 1, avgPrice: 100 }),
+      h({ id: 'h2', accountId: 'a1', symbol: 'X', quantity: 1, avgPrice: 200 }),
+      h({ id: 'h3', accountId: 'a1', symbol: 'Y', quantity: 5, avgPrice: 50 }),
+      h({ id: 'h4', accountId: 'a2', symbol: 'X', quantity: 7, avgPrice: 70 }),
+    ];
+    const out = mergeDuplicateHoldings(input);
+    expect(out).toHaveLength(3);
+    const bySymAcc = new Map(out.map((o) => [`${o.accountId}:${o.symbol}`, o]));
+    expect(bySymAcc.get('a1:X')?.quantity).toBe(2);
+    expect(bySymAcc.get('a1:Y')?.quantity).toBe(5);
+    expect(bySymAcc.get('a2:X')?.quantity).toBe(7);
+  });
+
+  it('returns an empty array unchanged', () => {
+    expect(mergeDuplicateHoldings([])).toEqual([]);
   });
 });
