@@ -125,7 +125,6 @@ export default function RetirementPage() {
       targetMonthly,
       targetAge: 0,
       currentAge: 0,
-      pensions: [],
     };
   }, [selected, planningMembers, targets, accounts, holdings, fxUsdKrw]);
 

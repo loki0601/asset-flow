@@ -4,7 +4,6 @@ import type {
   FamilyMember,
   Holding,
   Loan,
-  Pension,
   RetirementTarget,
   Transaction,
 } from '@/lib/schema';
@@ -57,5 +56,4 @@ export const accountsRepo = createCollectionRepo<Account>('accounts');
 export const holdingsRepo = createCollectionRepo<Holding>('holdings');
 export const transactionsRepo = createCollectionRepo<Transaction>('transactions');
 export const loansRepo = createCollectionRepo<Loan>('loans');
-export const pensionsRepo = createCollectionRepo<Pension>('pensions');
 export const retirementTargetsRepo = createCollectionRepo<RetirementTarget>('retirementTargets');

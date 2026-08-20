@@ -1,7 +1,7 @@
 /**
  * Shared typography/sizing tokens for list-item cards.
  *
- * Used by HoldingCard, LoanAccountCard, PensionCard. Editing values here
+ * Used by HoldingCard, LoanAccountCard. Editing values here
  * propagates to every card list — keep the cards visually consistent.
  *
  * Cards still own their *content layout* (different sections, footers, etc).

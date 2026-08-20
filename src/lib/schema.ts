@@ -135,44 +135,11 @@ export interface Loan {
   createdAt: string;
 }
 
-// ─── Pension ───────────────────────────────────────────────────────────
-
-export type PensionCategory = 'public' | 'corporate' | 'personal';
-
-interface PensionBase {
-  id: string;
-  userId: string;
-  memberId: string;
-  category: PensionCategory;
-  type: string;
-  title: string;
-  institution?: string;
-  createdAt: string;
-}
-
-export interface PublicPension extends PensionBase {
-  category: 'public';
-  monthlyAmount: number;
-  payPeriod: string;
-  startYear: string;
-}
-
-export interface CorporatePension extends PensionBase {
-  category: 'corporate';
-  totalValue: number;
-  yield: number;
-}
-
-export interface PersonalPension extends PensionBase {
-  category: 'personal';
-  totalValue: number;
-  annualContribution: number;
-  taxBenefit: number;
-}
-
-export type Pension = PublicPension | CorporatePension | PersonalPension;
-
 // ─── Retirement target ────────────────────────────────────────────────
+
+/** The three independently opt-in pension categories tracked per member —
+ *  see the `RetirementTarget` toggle fields below. */
+export type PensionCategory = 'public' | 'corporate' | 'personal';
 
 export interface RetirementTarget {
   id: string;
@@ -219,7 +186,7 @@ export interface RetirementTarget {
 
 /**
  * UI projection of a member's (or aggregate) retirement plan.
- * Derived from RetirementTarget + Pension; not stored as a single row.
+ * Derived from RetirementTarget; not stored as a single row.
  */
 export interface RetirementProfile {
   name: string;
@@ -227,7 +194,6 @@ export interface RetirementProfile {
   currentAge: number;
   targetMonthly: number;
   expectedMonthly: number;
-  pensions: Pension[];
 }
 
 // ─── Asset (server-provided market data) ──────────────────────────────
