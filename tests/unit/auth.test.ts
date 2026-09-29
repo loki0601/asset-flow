@@ -11,7 +11,9 @@ import {
   signup,
   DEFAULT_USERNAME,
   DEFAULT_PASSWORD,
+  hasLocalPortfolioData,
 } from '@/lib/auth';
+import { accountsRepo, holdingsRepo } from '@/lib/repos';
 
 beforeEach(() => {
   setStorage(new MemoryStore());
@@ -108,5 +110,20 @@ describe('login', () => {
   it('returns null on unknown username', async () => {
     const u = await login('ghost', 'whatever');
     expect(u).toBeNull();
+  });
+});
+
+describe('legacy-device migration guard', () => {
+  it('recognizes local investment data that must not be replaced by an empty server snapshot', async () => {
+    const user = await signup('loki0601', 'secret123');
+    accountsRepo.add(user.id, {
+      id: 'account-1', userId: user.id, memberId: 'member-1', institution: '키움증권', name: '메인', createdAt: '2026-09-29',
+    });
+    holdingsRepo.add(user.id, {
+      id: 'holding-1', userId: user.id, accountId: 'account-1', symbol: 'KRX:005930', quantity: 1, avgPrice: 70000,
+      createdAt: '2026-09-29', updatedAt: '2026-09-29',
+    });
+
+    expect(hasLocalPortfolioData('loki0601')).toBe(true);
   });
 });

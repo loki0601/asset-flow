@@ -86,6 +86,22 @@ export function clearServerSession(): void {
   removeKey(SERVER_SESSION_KEY);
 }
 
+/** True when a legacy device has financial data that must win its first sync. */
+export function hasLocalPortfolioData(username: string): boolean {
+  const user = findUserByUsername(username);
+  if (!user) return false;
+  const storage = getStorage();
+  return ['accounts', 'holdings', 'transactions', 'loans', 'retirementTargets'].some((collection) => {
+    const raw = storage.getItem(userKey(user.id, collection));
+    if (!raw) return false;
+    try {
+      return Array.isArray(JSON.parse(raw)) && JSON.parse(raw).length > 0;
+    } catch {
+      return false;
+    }
+  });
+}
+
 export async function seedDefaultUser(): Promise<User> {
   const existing = findUserByUsername(DEFAULT_USERNAME);
   if (existing) {

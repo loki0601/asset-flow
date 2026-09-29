@@ -1,4 +1,4 @@
-import { adoptServerSession, type ServerSession } from '@/lib/auth';
+import { adoptServerSession, hasLocalPortfolioData, type ServerSession } from '@/lib/auth';
 import { exportDbForSync, flushPersistDb, importDbFromSync } from '@/lib/db';
 
 interface RemoteAuthResponse {
@@ -48,9 +48,10 @@ export async function uploadSyncSnapshot(session: ServerSession): Promise<void> 
  * server snapshot exists; every later device downloads the same snapshot.
  */
 export async function connectServerSession(session: ServerSession): Promise<'uploaded' | 'downloaded'> {
+  const preserveLegacyPortfolio = hasLocalPortfolioData(session.user.username);
   adoptServerSession(session);
   const response = await fetch('/api/sync/snapshot', { headers: headers(session) });
-  if (response.status === 204) {
+  if (response.status === 204 || preserveLegacyPortfolio) {
     await uploadSyncSnapshot(session);
     return 'uploaded';
   }
