@@ -38,30 +38,41 @@ export function seedChangeFeed(userId: string): void {
   }
 }
 
+// The server route hard-rejects any single request carrying more than this
+// many changes (400). A first sync for an existing account (seedChangeFeed
+// queues every local row at once) can easily exceed it, so the outbox is
+// flushed in batches rather than one all-or-nothing POST.
+const MAX_CHANGES_PER_REQUEST = 100;
+
 export async function flushChangeOutbox(userId: string): Promise<void> {
   const session = getServerSession();
   if (!session || session.user.id !== userId) return;
-  const state = syncState(userId);
-  if (!state.outbox.length) return;
-  const submitted = [...state.outbox];
-  const response = await fetch('/api/sync/changes', { method: 'POST', headers: { Authorization: `Bearer ${session.token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ changes: submitted }) });
-  if (!response.ok) throw new Error('변경분 동기화에 실패했습니다.');
-  const body = await response.json() as { results: Array<{ ok: boolean; cursor?: number; version?: number }> };
-  submitted.forEach((change, index) => {
-    const result = body.results[index];
-    if (result?.ok && result.version != null && result.cursor != null) {
-      state.versions[versionKey(change.collection, change.entityId)] = result.version;
-      // Do not advance the pull cursor here. A concurrently committed remote
-      // change can have an earlier cursor than this acknowledgement; skipping
-      // directly to our cursor would permanently miss that remote change.
+  let state = syncState(userId);
+  while (state.outbox.length) {
+    const submitted = state.outbox.slice(0, MAX_CHANGES_PER_REQUEST);
+    const response = await fetch('/api/sync/changes', { method: 'POST', headers: { Authorization: `Bearer ${session.token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ changes: submitted }) });
+    if (!response.ok) throw new Error('변경분 동기화에 실패했습니다.');
+    const body = await response.json() as { results: Array<{ ok: boolean; cursor?: number; version?: number }> };
+    submitted.forEach((change, index) => {
+      const result = body.results[index];
+      if (result?.ok && result.version != null && result.cursor != null) {
+        state.versions[versionKey(change.collection, change.entityId)] = result.version;
+        // Do not advance the pull cursor here. A concurrently committed remote
+        // change can have an earlier cursor than this acknowledgement; skipping
+        // directly to our cursor would permanently miss that remote change.
+      }
+    });
+    const conflicts = submitted.filter((change, index) => !body.results[index]?.ok);
+    const acknowledged = new Set(
+      submitted.filter((_, index) => body.results[index]?.ok).map((change) => versionKey(change.collection, change.entityId) + '@' + change.clientUpdatedAt),
+    );
+    state.outbox = state.outbox.filter((change) => !acknowledged.has(versionKey(change.collection, change.entityId) + '@' + change.clientUpdatedAt));
+    writeJSON(stateKey(userId), state);
+    if (conflicts.length) {
+      await pullChangeFeed(userId, new Set(conflicts.map((change) => versionKey(change.collection, change.entityId))));
+      reapplyHoldingConflicts(userId, conflicts, submitted, body.results);
+      state = syncState(userId);
     }
-  });
-  const conflicts = submitted.filter((change, index) => !body.results[index]?.ok);
-  state.outbox = state.outbox.filter((_, index) => !body.results[index]?.ok);
-  writeJSON(stateKey(userId), state);
-  if (conflicts.length) {
-    await pullChangeFeed(userId, new Set(conflicts.map((change) => versionKey(change.collection, change.entityId))));
-    reapplyHoldingConflicts(userId, conflicts, submitted, body.results);
   }
 }
 

@@ -99,4 +99,39 @@ describe('change-feed pull', () => {
     expect(latestHolding).toMatchObject({ quantity: 9, avgPrice: 103.33333333333333 });
     expect(readJSON<{ outbox: unknown[] }>(userKey(user.id, 'change-sync'), { outbox: [] }).outbox).toEqual([]);
   });
+
+  it('flushes an outbox bigger than the server\'s 100-changes-per-request cap in multiple batches', async () => {
+    // A real first-time sync for an existing heavy account (loki0601 has
+    // months of accounts/holdings/transactions/loans) queues every local row
+    // at once via seedChangeFeed. The server route hard-rejects any single
+    // request over 100 changes with a 400, and flushChangeOutbox used to
+    // send the whole outbox in one POST — so any account with >100 local
+    // rows failed sync on every single login attempt, forever, with the
+    // exact error the user saw ("변경분 동기화에 실패했습니다").
+    const user = createServerUser('loki0601', 'correct horse battery staple');
+    adoptServerSession({ token: 'token', user: { id: user.id, username: 'loki0601', createdAt: user.createdAt } });
+    for (let i = 0; i < 130; i++) {
+      queueLocalChange(user.id, 'transactions', `tx-${i}`, 'upsert', trade('buy', 1, 100));
+    }
+    let maxBatchSize = 0;
+    vi.stubGlobal('fetch', vi.fn(async (input: string, init?: RequestInit) => {
+      if (input === '/api/sync/changes' && init?.method === 'POST') {
+        const { changes } = JSON.parse(String(init.body)) as { changes: Parameters<typeof appendSyncChange>[1][] };
+        maxBatchSize = Math.max(maxBatchSize, changes.length);
+        if (changes.length > 100) {
+          return new Response(JSON.stringify({ error: '1~100개의 변경분이 필요합니다.' }), { status: 400 });
+        }
+        return new Response(JSON.stringify({ results: changes.map((change) => appendSyncChange(user.id, change)) }), { status: 200 });
+      }
+      const cursor = Number(new URL(input, 'http://localhost').searchParams.get('cursor') ?? '0');
+      const changes = listSyncChanges(user.id, cursor);
+      return new Response(JSON.stringify({ changes, cursor: changes.at(-1)?.cursor ?? cursor }), { status: 200 });
+    }));
+
+    await flushChangeOutbox(user.id);
+
+    expect(maxBatchSize).toBeLessThanOrEqual(100);
+    expect(readJSON<{ outbox: unknown[] }>(userKey(user.id, 'change-sync'), { outbox: [] }).outbox).toEqual([]);
+    expect(listSyncChanges(user.id, 0)).toHaveLength(130);
+  });
 });
