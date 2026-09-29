@@ -87,6 +87,15 @@ function bootstrap(db: DB): void {
       updated_at TEXT NOT NULL,
       revision   INTEGER NOT NULL DEFAULT 1
     );
+    CREATE TABLE IF NOT EXISTS user_sync_snapshot_history (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id     TEXT NOT NULL REFERENCES app_users(id),
+      revision    INTEGER NOT NULL,
+      blob        BLOB NOT NULL,
+      archived_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_user_sync_snapshot_history_user
+      ON user_sync_snapshot_history (user_id, archived_at DESC);
     CREATE TABLE IF NOT EXISTS reference_events (
       id          TEXT PRIMARY KEY,
       kind        TEXT NOT NULL,
@@ -221,17 +230,44 @@ export const userSnapshotRepo = {
   },
   put(userId: string, blob: Buffer): UserSnapshot {
     const updatedAt = new Date().toISOString();
-    getServerDb()
-      .prepare(
+    const db = getServerDb();
+    const previous = this.get(userId);
+    const write = db.transaction(() => {
+      if (previous) {
+        db.prepare(
+          `INSERT INTO user_sync_snapshot_history (user_id, revision, blob, archived_at)
+           VALUES (?, ?, ?, ?)`,
+        ).run(userId, previous.revision, previous.blob, updatedAt);
+      }
+      db.prepare(
         `INSERT INTO user_sync_snapshots (user_id, blob, updated_at, revision)
          VALUES (?, ?, ?, 1)
          ON CONFLICT(user_id) DO UPDATE SET
            blob = excluded.blob,
            updated_at = excluded.updated_at,
            revision = user_sync_snapshots.revision + 1`,
-      )
-      .run(userId, blob, updatedAt);
+      ).run(userId, blob, updatedAt);
+      // Retain a bounded recovery trail for each account before pruning.
+      db.prepare(
+        `DELETE FROM user_sync_snapshot_history
+         WHERE user_id = ? AND id NOT IN (
+           SELECT id FROM user_sync_snapshot_history
+           WHERE user_id = ? ORDER BY archived_at DESC, id DESC LIMIT 20
+         )`,
+      ).run(userId, userId);
+    });
+    write();
     return this.get(userId)!;
+  },
+  listHistory(userId: string): UserSnapshot[] {
+    return (getServerDb()
+      .prepare(
+        `SELECT blob, archived_at AS updated_at, revision
+         FROM user_sync_snapshot_history WHERE user_id = ?
+         ORDER BY archived_at DESC, id DESC`,
+      )
+      .all(userId) as Array<{ blob: Buffer; updated_at: string; revision: number }>)
+      .map((row) => ({ blob: row.blob, updatedAt: row.updated_at, revision: row.revision }));
   },
 };
 

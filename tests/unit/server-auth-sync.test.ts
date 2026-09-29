@@ -44,6 +44,7 @@ describe('per-user synchronized snapshots', () => {
     userSnapshotRepo.put(loki.id, latest);
 
     expect(userSnapshotRepo.get(loki.id)?.blob).toEqual(latest);
+    expect(userSnapshotRepo.listHistory(loki.id)[0]?.blob).toEqual(first);
     expect(userSnapshotRepo.get(other.id)).toBeNull();
   });
 });
