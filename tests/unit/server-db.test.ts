@@ -11,6 +11,9 @@ import {
   trackedSymbolsRepo,
   serverPriceHistoryRepo,
   shouldBackfill,
+  createServerUser,
+  createSession,
+  getSessionUser,
 } from '@/server/db';
 
 beforeEach(() => {
@@ -61,6 +64,36 @@ describe('trackedSymbolsRepo', () => {
     trackedSymbolsRepo.setStatus('KRX:C', 'failed');
 
     expect(trackedSymbolsRepo.listReady()).toEqual(['KRX:B']);
+  });
+});
+
+describe('createSession (login persistence — stay signed in until explicit logout)', () => {
+  it('issues a token that is still valid 50 years later', () => {
+    const user = createServerUser('sessiontester', 'password123');
+    const token = createSession(user.id);
+
+    const RealDate = Date;
+    const farFuture = new RealDate(RealDate.now() + 50 * 365 * 24 * 60 * 60 * 1000);
+    class FakeDate extends RealDate {
+      constructor(...args: ConstructorParameters<typeof Date>) {
+        if (args.length === 0) {
+          super(farFuture.getTime());
+        } else {
+          // @ts-expect-error — forwarding whatever constructor overload was called
+          super(...args);
+        }
+      }
+      static now() {
+        return farFuture.getTime();
+      }
+    }
+    // @ts-expect-error — swapping the global Date for the duration of this assertion
+    globalThis.Date = FakeDate;
+    try {
+      expect(getSessionUser(token)?.id).toBe(user.id);
+    } finally {
+      globalThis.Date = RealDate;
+    }
   });
 });
 

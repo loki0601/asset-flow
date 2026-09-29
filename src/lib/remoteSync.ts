@@ -57,7 +57,13 @@ export async function connectServerSession(session: ServerSession): Promise<'upl
   }
   if (!response.ok) throw new Error('서버 동기화 데이터를 불러오지 못했습니다.');
   await importDbFromSync(new Uint8Array(await response.arrayBuffer()));
-  // Session data is intentionally excluded from the server snapshot.
+  // Session data is intentionally excluded from the server snapshot, so the
+  // import above wipes it — re-adopt it into the freshly imported DB. Await
+  // the flush so the session is durable before this resolves: without it,
+  // adoptServerSession only *schedules* a debounced write, and an Android
+  // process kill shortly after login (backgrounding, low memory) can lose it
+  // before it reaches IndexedDB, bouncing the user back to /login.
   adoptServerSession(session);
+  await flushPersistDb();
   return 'downloaded';
 }

@@ -175,13 +175,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // since the WebView process may be killed without firing microtasks.
   useEffect(() => {
     const RESUME_COOLDOWN_MS = 60 * 60 * 1000;
+    const flushOnBackground = () => {
+      flushPersistDb().then(() => {
+        const session = getServerSession();
+        if (session && state.userId) return flushChangeOutbox(state.userId);
+        return undefined;
+      }).catch((err) => console.warn('[AuthProvider] background sync skipped:', err));
+    };
+    // Native Android: onPause fires before the OS can kill the process for
+    // memory, which visibilitychange doesn't always guarantee in a WebView.
+    // Without this, a session written right after login (still a debounced,
+    // unflushed write at that point) can be lost if the app is backgrounded
+    // and killed within seconds — the user lands back on /login looking
+    // logged out even though the server issued a valid session.
+    let removePauseListener: (() => void) | null = null;
+    import('@capacitor/core').then(({ Capacitor }) => {
+      if (Capacitor.getPlatform() !== 'android') return;
+      import('@capacitor/app').then(({ App }) => {
+        App.addListener('pause', flushOnBackground).then((handle) => {
+          removePauseListener = () => void handle.remove();
+        });
+      }).catch((err) => console.warn('[AuthProvider] pause listener init failed', err));
+    }).catch(() => {});
     const handler = () => {
       if (document.visibilityState === 'hidden') {
-        flushPersistDb().then(() => {
-          const session = getServerSession();
-          if (session && state.userId) return flushChangeOutbox(state.userId);
-          return undefined;
-        }).catch((err) => console.warn('[AuthProvider] background sync skipped:', err));
+        flushOnBackground();
         return;
       }
       if (document.visibilityState !== 'visible') return;
@@ -204,7 +222,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     };
     document.addEventListener('visibilitychange', handler);
-    return () => document.removeEventListener('visibilitychange', handler);
+    return () => {
+      document.removeEventListener('visibilitychange', handler);
+      removePauseListener?.();
+    };
   }, [refreshPrices, state.userId]);
 
   // In-session live polling: while the app is visible and at least one held

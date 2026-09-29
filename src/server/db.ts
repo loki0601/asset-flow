@@ -208,11 +208,17 @@ export function authenticateUser(username: string, password: string): ServerUser
   return toServerUser(row);
 }
 
+// Sessions are meant to outlive the app being closed/killed — the user signs
+// out explicitly (Settings) rather than being bounced by a rolling expiry.
+// 100 years is effectively "no expiry" while keeping the schema's NOT NULL
+// expires_at column and the getSessionUser comparison intact.
+const SESSION_LIFETIME_MS = 100 * 365 * 24 * 60 * 60 * 1000;
+
 export function createSession(userId: string): string {
   const token = randomBytes(32).toString('base64url');
   const tokenHash = createHash('sha256').update(token).digest('hex');
   const now = new Date();
-  const expiresAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString();
+  const expiresAt = new Date(now.getTime() + SESSION_LIFETIME_MS).toISOString();
   const db = getServerDb();
   db.prepare('DELETE FROM app_sessions WHERE expires_at <= ?').run(now.toISOString());
   db.prepare('INSERT INTO app_sessions (token_hash, user_id, expires_at, created_at) VALUES (?, ?, ?, ?)')
