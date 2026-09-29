@@ -25,7 +25,15 @@
  * Cache version is bumped here on intentional invalidation (or via the
  * client posting {type: 'BUMP_CACHE'}). Old caches are pruned on activate.
  */
-const VERSION = 'v6';
+// Bumped 2026-09-29: a stale cached navigation (HTML referencing an old JS
+// bundle) survived a client-side bug fix deploy because networkFirstTimeout
+// falls back to this SW's own cache — which next.config's no-store header
+// on HTML doesn't touch, since the Cache Storage API isn't subject to it —
+// whenever the Cloudflare Tunnel round trip missed NAV_TIMEOUT_MS. Bumping
+// VERSION forces every client to drop that cache and re-fetch fresh HTML/JS
+// on next boot. Bump this again whenever a client-side fix must reach
+// existing installs immediately rather than on their next lucky fast fetch.
+const VERSION = 'v7';
 const CACHE = `assetflow-${VERSION}`;
 
 // Navigation network deadline. Long enough for a healthy tunnel round trip,
