@@ -57,6 +57,29 @@ describe('change-feed CAS', () => {
     expect(listSyncChanges(user.id, 0)).toHaveLength(1);
   });
 
+  it('records transaction add, update, and delete as separately cursor-addressable mutations', () => {
+    const user = createServerUser('loki0601', 'correct horse battery staple');
+    const created = appendSyncChange(user.id, {
+      collection: 'transactions', entityId: 'trade-1', kind: 'upsert', baseVersion: 0,
+      payload: { id: 'trade-1', type: 'buy', quantity: 1 }, clientUpdatedAt: '2026-09-29T00:00:00.000Z',
+    });
+    const updated = appendSyncChange(user.id, {
+      collection: 'transactions', entityId: 'trade-1', kind: 'upsert', baseVersion: created.version,
+      payload: { id: 'trade-1', type: 'buy', quantity: 2 }, clientUpdatedAt: '2026-09-29T00:01:00.000Z',
+    });
+    const deleted = appendSyncChange(user.id, {
+      collection: 'transactions', entityId: 'trade-1', kind: 'delete', baseVersion: updated.version,
+      clientUpdatedAt: '2026-09-29T00:02:00.000Z',
+    });
+
+    expect([created, updated, deleted]).toEqual([
+      expect.objectContaining({ ok: true, version: 1 }),
+      expect.objectContaining({ ok: true, version: 2 }),
+      expect.objectContaining({ ok: true, version: 3 }),
+    ]);
+    expect(listSyncChanges(user.id, 0).map((change) => change.kind)).toEqual(['upsert', 'upsert', 'delete']);
+  });
+
   it('preserves simultaneous Android buy and web sell by rebasing the stale holding after both ledger rows land', () => {
     const user = createServerUser('loki0601', 'correct horse battery staple');
     const original: Holding = {
