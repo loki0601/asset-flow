@@ -47,16 +47,18 @@ export default function SignupPage() {
     try {
       const session = await signupOnServer(username, password);
       await connectServerSession(session);
-      // The 성명 field doubles as the first family member's name — keeps
-      // the onboarding short by skipping the standalone "구성원 추가"
-      // step. Account creation still happens in /onboarding step 2.
-      const member: FamilyMember = {
-        id: createId(),
-        userId: session.user.id,
-        name: name.trim(),
-        createdAt: new Date().toISOString(),
-      };
-      familyRepo.add(session.user.id, member);
+      // On the first server conversion, connectServerSession may have just
+      // re-keyed this device's existing local family data. Only brand-new
+      // accounts need the signup name to become their first member.
+      if (familyRepo.list(session.user.id).length === 0) {
+        const member: FamilyMember = {
+          id: createId(),
+          userId: session.user.id,
+          name: name.trim(),
+          createdAt: new Date().toISOString(),
+        };
+        familyRepo.add(session.user.id, member);
+      }
       await uploadSyncSnapshot(session);
       refreshHoldingsData();
       signIn(session.user.id);
