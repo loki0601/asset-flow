@@ -16,7 +16,8 @@ import {
 import { createId } from '@paralleldrive/cuid2';
 import { useSignIn } from '@/components/AuthProvider';
 import { useHoldingsData } from '@/components/HoldingsDataProvider';
-import { connectServerSession, signupOnServer, uploadSyncSnapshot } from '@/lib/remoteSync';
+import { connectServerSession, signupOnServer } from '@/lib/remoteSync';
+import { flushChangeOutbox, seedChangeFeed } from '@/lib/changeSync';
 import { familyRepo } from '@/lib/repos';
 import type { FamilyMember } from '@/lib/schema';
 
@@ -59,7 +60,8 @@ export default function SignupPage() {
         };
         familyRepo.add(session.user.id, member);
       }
-      await uploadSyncSnapshot(session);
+      seedChangeFeed(session.user.id);
+      await flushChangeOutbox(session.user.id);
       refreshHoldingsData();
       signIn(session.user.id);
       // Onboarding's useEffect detects the existing member and jumps the

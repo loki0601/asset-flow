@@ -96,6 +96,17 @@ function bootstrap(db: DB): void {
     );
     CREATE INDEX IF NOT EXISTS idx_user_sync_snapshot_history_user
       ON user_sync_snapshot_history (user_id, archived_at DESC);
+    CREATE TABLE IF NOT EXISTS user_sync_entities (
+      user_id TEXT NOT NULL REFERENCES app_users(id), collection TEXT NOT NULL,
+      entity_id TEXT NOT NULL, version INTEGER NOT NULL, deleted INTEGER NOT NULL DEFAULT 0,
+      payload TEXT, updated_at TEXT NOT NULL, PRIMARY KEY (user_id, collection, entity_id)
+    );
+    CREATE TABLE IF NOT EXISTS user_sync_changes (
+      cursor INTEGER PRIMARY KEY AUTOINCREMENT, user_id TEXT NOT NULL REFERENCES app_users(id),
+      collection TEXT NOT NULL, entity_id TEXT NOT NULL, kind TEXT NOT NULL,
+      version INTEGER NOT NULL, payload TEXT, created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_user_sync_changes_cursor ON user_sync_changes (user_id, cursor);
     CREATE TABLE IF NOT EXISTS reference_events (
       id          TEXT PRIMARY KEY,
       kind        TEXT NOT NULL,
@@ -270,6 +281,57 @@ export const userSnapshotRepo = {
       .map((row) => ({ blob: row.blob, updatedAt: row.updated_at, revision: row.revision }));
   },
 };
+
+export type SyncChangeInput = {
+  collection: string; entityId: string; kind: 'upsert' | 'delete'; baseVersion: number;
+  payload?: Record<string, unknown>; clientUpdatedAt: string;
+};
+export type SyncChangeResult =
+  | { ok: true; cursor: number; version: number }
+  | { ok: false; currentVersion: number };
+
+export function appendSyncChange(userId: string, input: SyncChangeInput): SyncChangeResult {
+  const db = getServerDb();
+  return db.transaction(() => {
+    const existing = db.prepare(
+      'SELECT version, deleted, payload FROM user_sync_entities WHERE user_id = ? AND collection = ? AND entity_id = ?',
+    ).get(userId, input.collection, input.entityId) as { version: number; deleted: number; payload: string | null } | undefined;
+    const currentVersion = existing?.version ?? 0;
+    const payload = input.kind === 'delete' ? null : JSON.stringify(input.payload ?? {});
+    if (currentVersion !== input.baseVersion) {
+      // A response may be lost after the server commits. Retrying that exact
+      // mutation must acknowledge the original cursor, not create a second
+      // transaction or leave the device retrying forever.
+      if (existing && existing.deleted === (input.kind === 'delete' ? 1 : 0) && existing.payload === payload) {
+        const row = db.prepare(
+          'SELECT cursor FROM user_sync_changes WHERE user_id = ? AND collection = ? AND entity_id = ? AND version = ? ORDER BY cursor DESC LIMIT 1',
+        ).get(userId, input.collection, input.entityId, currentVersion) as { cursor: number } | undefined;
+        if (row) return { ok: true as const, cursor: row.cursor, version: currentVersion };
+      }
+      return { ok: false as const, currentVersion };
+    }
+    const version = currentVersion + 1;
+    db.prepare(
+      `INSERT INTO user_sync_entities (user_id, collection, entity_id, version, deleted, payload, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(user_id, collection, entity_id) DO UPDATE SET version=excluded.version, deleted=excluded.deleted, payload=excluded.payload, updated_at=excluded.updated_at`,
+    ).run(userId, input.collection, input.entityId, version, input.kind === 'delete' ? 1 : 0, payload, input.clientUpdatedAt);
+    const cursor = db.prepare(
+      'INSERT INTO user_sync_changes (user_id, collection, entity_id, kind, version, payload, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    ).run(userId, input.collection, input.entityId, input.kind, version, payload, input.clientUpdatedAt).lastInsertRowid;
+    return { ok: true as const, cursor: Number(cursor), version };
+  })();
+}
+
+export function listSyncChanges(userId: string, afterCursor: number) {
+  return dbRowsToChanges(getServerDb().prepare(
+    'SELECT cursor, collection, entity_id, kind, version, payload, created_at FROM user_sync_changes WHERE user_id = ? AND cursor > ? ORDER BY cursor ASC',
+  ).all(userId, afterCursor) as Array<{ cursor: number; collection: string; entity_id: string; kind: 'upsert' | 'delete'; version: number; payload: string | null; created_at: string }>);
+}
+
+function dbRowsToChanges(rows: Array<{ cursor: number; collection: string; entity_id: string; kind: 'upsert' | 'delete'; version: number; payload: string | null; created_at: string }>) {
+  return rows.map((row) => ({ cursor: row.cursor, collection: row.collection, entityId: row.entity_id, kind: row.kind, version: row.version, payload: row.payload ? JSON.parse(row.payload) as Record<string, unknown> : null, updatedAt: row.created_at }));
+}
 
 // ─── Repos ────────────────────────────────────────────────────────────
 

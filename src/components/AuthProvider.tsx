@@ -41,7 +41,8 @@ import { ingestNativePendingSync } from '@/lib/nativeSync';
 import { initStatusBar } from '@/lib/statusBar';
 import { initBackButton } from '@/lib/backButton';
 import { registerServiceWorker } from '@/lib/serviceWorker';
-import { connectServerSession, uploadSyncSnapshot } from '@/lib/remoteSync';
+import { connectServerSession } from '@/lib/remoteSync';
+import { flushChangeOutbox, pullChangeFeed, seedChangeFeed } from '@/lib/changeSync';
 
 interface AuthValue {
   userId: string | null;
@@ -161,7 +162,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
     window.addEventListener('assetflow:fcm-sync-prices', handler);
     return () => window.removeEventListener('assetflow:fcm-sync-prices', handler);
-  }, [refreshPrices]);
+  }, [refreshPrices, state.userId]);
 
   // When the app comes back to foreground, check for any pending native-side
   // sync the FirebaseMessagingService left behind while we were dead, then
@@ -178,7 +179,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (document.visibilityState === 'hidden') {
         flushPersistDb().then(() => {
           const session = getServerSession();
-          if (session) return uploadSyncSnapshot(session);
+          if (session && state.userId) return flushChangeOutbox(state.userId);
           return undefined;
         }).catch((err) => console.warn('[AuthProvider] background sync skipped:', err));
         return;
@@ -196,10 +197,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           console.warn('[AuthProvider] resume price sync skipped', err),
         );
       }
+      if (state.userId) {
+        pullChangeFeed(state.userId).then((changed) => {
+          if (changed) window.location.reload();
+        }).catch((err) => console.warn('[AuthProvider] change pull skipped:', err));
+      }
     };
     document.addEventListener('visibilitychange', handler);
     return () => document.removeEventListener('visibilitychange', handler);
-  }, [refreshPrices]);
+  }, [refreshPrices, state.userId]);
 
   // In-session live polling: while the app is visible and at least one held
   // symbol's market is open, overlay live ticks hourly. Without this the
@@ -256,6 +262,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setCurrentUserId(null);
         }
         const userId = getCurrentUserId();
+        if (userId) {
+          // Snapshots are only the one-time migration/first-device bootstrap.
+          // All later portfolio writes travel through the append-only change feed.
+          seedChangeFeed(userId);
+          await flushChangeOutbox(userId);
+          await pullChangeFeed(userId);
+        }
         if (!cancelled) {
           setState({
             userId,
@@ -432,7 +445,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (timer) clearTimeout(timer);
       timer = setTimeout(() => {
         const session = getServerSession();
-        if (session) uploadSyncSnapshot(session).catch((err) =>
+        if (session && state.userId) flushChangeOutbox(state.userId).catch((err) =>
           console.warn('[AuthProvider] automatic sync skipped:', err),
         );
       }, 1_500);
@@ -442,7 +455,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       window.removeEventListener('assetflow:local-data-changed', schedule);
       if (timer) clearTimeout(timer);
     };
-  }, []);
+  }, [state.userId]);
 
   const signIn = useCallback((userId: string) => {
     setState((prev) => ({ ...prev, userId }));

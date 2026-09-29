@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { AlertCircle, Eye, EyeOff, Lock, User } from 'lucide-react';
 import { useSignIn } from '@/components/AuthProvider';
 import { connectServerSession, loginToServer } from '@/lib/remoteSync';
+import { flushChangeOutbox, pullChangeFeed, seedChangeFeed } from '@/lib/changeSync';
 import { AuroraMark } from '@/components/AuroraMark';
 
 export default function LoginPage() {
@@ -28,6 +29,9 @@ export default function LoginPage() {
     try {
       const session = await loginToServer(username.trim(), password);
       await connectServerSession(session);
+      seedChangeFeed(session.user.id);
+      await flushChangeOutbox(session.user.id);
+      await pullChangeFeed(session.user.id);
       signIn(session.user.id);
       router.replace('/');
     } catch (err) {

@@ -1,4 +1,5 @@
 import { readJSON, userKey, writeJSON } from '@/lib/storage';
+import { queueLocalChange } from '@/lib/changeSync';
 import type {
   Account,
   FamilyMember,
@@ -32,18 +33,22 @@ function createCollectionRepo<T extends { id: string }>(collection: string): Col
     },
     add(userId, item) {
       writeJSON<T[]>(key(userId), [...this.list(userId), item]);
+      queueLocalChange(userId, collection, item.id, 'upsert', item);
     },
     update(userId, id, patch) {
+      const next = this.get(userId, id);
       writeJSON<T[]>(
         key(userId),
         this.list(userId).map((x) => (x.id === id ? { ...x, ...patch } : x)),
       );
+      if (next) queueLocalChange(userId, collection, id, 'upsert', { ...next, ...patch });
     },
     remove(userId, id) {
       writeJSON<T[]>(
         key(userId),
         this.list(userId).filter((x) => x.id !== id),
       );
+      queueLocalChange(userId, collection, id, 'delete');
     },
     replaceAll(userId, items) {
       writeJSON<T[]>(key(userId), items);
