@@ -193,6 +193,41 @@ export function getDb(): Database {
   return db;
 }
 
+/**
+ * Export a portable user-data snapshot without carrying a device's login
+ * session or the legacy local-password cache to another device.
+ */
+export function exportDbForSync(): Uint8Array {
+  const database = getDb();
+  const privateKeys = ['assetflow:users', 'assetflow:session', 'assetflow:server-session'];
+  const saved = privateKeys.map((key) => [key, kvGet(key)] as const);
+  for (const [key] of saved) database.run('DELETE FROM kv WHERE key = ?', [key]);
+  const snapshot = database.export();
+  for (const [key, value] of saved) {
+    if (value != null) {
+      database.run('INSERT INTO kv (key, value) VALUES (?, ?)', [key, value]);
+    }
+  }
+  return snapshot;
+}
+
+/** Replace this device's local cache with an authenticated server snapshot. */
+export async function importDbFromSync(snapshot: Uint8Array): Promise<void> {
+  if (!SQL) await initDb();
+  if (!SQL) throw new Error('SQLite runtime could not be initialized');
+  const previous = db;
+  db = new SQL.Database(snapshot);
+  if (previous) {
+    try {
+      previous.close();
+    } catch {
+      /* ignore a stale connection */
+    }
+  }
+  persister.save(db.export());
+  if (persister instanceof IndexedDbBlobPersister) await persister.awaitLatest();
+}
+
 // persistDb serializes the full ~4MB sql.js blob and writes it to
 // localStorage — base64 + setItem costs hundreds of ms. Multiple kvSet calls
 // in the same tick (e.g. setLocalCatalog writes 3 keys, or a hot loop of
@@ -214,6 +249,9 @@ export function persistDb(): void {
     persistScheduled = false;
     if (!db) return;
     persister.save(db.export());
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('assetflow:local-data-changed'));
+    }
     if (pendingPersist) {
       pendingPersist = false;
       persistDb();

@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { AlertCircle, Eye, EyeOff, Lock, User } from 'lucide-react';
 import { useSignIn } from '@/components/AuthProvider';
-import { login } from '@/lib/auth';
+import { connectServerSession, loginToServer } from '@/lib/remoteSync';
 import { AuroraMark } from '@/components/AuroraMark';
 
 export default function LoginPage() {
@@ -26,13 +26,12 @@ export default function LoginPage() {
     }
     setSubmitting(true);
     try {
-      const user = await login(username.trim(), password);
-      if (!user) {
-        setError('아이디 또는 비밀번호가 올바르지 않습니다.');
-        return;
-      }
-      signIn(user.id);
+      const session = await loginToServer(username.trim(), password);
+      await connectServerSession(session);
+      signIn(session.user.id);
       router.replace('/');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '로그인하지 못했습니다.');
     } finally {
       setSubmitting(false);
     }
@@ -138,9 +137,9 @@ export default function LoginPage() {
 
       {/* Compliance footer anchored to bottom of screen */}
       <p className="w-full text-[10px] text-brand-sage text-center font-medium leading-normal pt-6">
-        모든 자산 데이터는 디바이스에 로컬 저장됩니다.
+        로그인한 계정의 자산 데이터는 서버와 동기화됩니다.
         <br />
-        서버 백업은 사용자의 명시적 동작이 있을 때만 진행됩니다.
+        오프라인 상태에서는 기기에 저장 후 연결되면 반영됩니다.
       </p>
     </main>
   );

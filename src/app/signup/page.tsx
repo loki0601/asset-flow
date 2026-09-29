@@ -16,7 +16,7 @@ import {
 import { createId } from '@paralleldrive/cuid2';
 import { useSignIn } from '@/components/AuthProvider';
 import { useHoldingsData } from '@/components/HoldingsDataProvider';
-import { signup } from '@/lib/auth';
+import { connectServerSession, signupOnServer, uploadSyncSnapshot } from '@/lib/remoteSync';
 import { familyRepo } from '@/lib/repos';
 import type { FamilyMember } from '@/lib/schema';
 
@@ -45,19 +45,21 @@ export default function SignupPage() {
     }
     setSubmitting(true);
     try {
-      const user = await signup(username, password);
+      const session = await signupOnServer(username, password);
+      await connectServerSession(session);
       // The 성명 field doubles as the first family member's name — keeps
       // the onboarding short by skipping the standalone "구성원 추가"
       // step. Account creation still happens in /onboarding step 2.
       const member: FamilyMember = {
         id: createId(),
-        userId: user.id,
+        userId: session.user.id,
         name: name.trim(),
         createdAt: new Date().toISOString(),
       };
-      familyRepo.add(user.id, member);
+      familyRepo.add(session.user.id, member);
+      await uploadSyncSnapshot(session);
       refreshHoldingsData();
-      signIn(user.id);
+      signIn(session.user.id);
       // Onboarding's useEffect detects the existing member and jumps the
       // wizard straight to the account step.
       router.replace('/onboarding');
@@ -130,11 +132,11 @@ export default function SignupPage() {
           <FieldRow
             icon={<Lock size={18} />}
             type={showPassword ? 'text' : 'password'}
-            placeholder="비밀번호 (4자 이상)"
+            placeholder="비밀번호 (8자 이상)"
             value={password}
             onChange={setPassword}
             autoComplete="new-password"
-            minLength={4}
+            minLength={8}
             rightAdornment={
               <button
                 type="button"
@@ -153,7 +155,7 @@ export default function SignupPage() {
             value={confirm}
             onChange={setConfirm}
             autoComplete="new-password"
-            minLength={4}
+            minLength={8}
           />
 
           <button
@@ -173,9 +175,7 @@ export default function SignupPage() {
         </form>
 
         <p className="text-[10px] text-brand-sage text-center font-medium leading-normal mt-6">
-          가입 시 모든 자산·대출·노후 데이터는
-          <br />
-          이 디바이스의 로컬 IndexedDB 에만 저장됩니다.
+          가입한 계정으로 웹과 Android의 데이터를 동기화합니다.
         </p>
       </div>
     </main>

@@ -15,6 +15,7 @@
  */
 
 import Database, { type Database as DB } from 'better-sqlite3';
+import { createHash, randomBytes, randomUUID, scryptSync, timingSafeEqual } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -66,6 +67,26 @@ function bootstrap(db: DB): void {
     );
     CREATE INDEX IF NOT EXISTS idx_user_backups_user_created
       ON user_backups (user_id, created_at DESC);
+    CREATE TABLE IF NOT EXISTS app_users (
+      id            TEXT PRIMARY KEY,
+      username      TEXT NOT NULL UNIQUE COLLATE NOCASE,
+      password_hash TEXT NOT NULL,
+      created_at    TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS app_sessions (
+      token_hash TEXT PRIMARY KEY,
+      user_id    TEXT NOT NULL REFERENCES app_users(id),
+      expires_at TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_app_sessions_user
+      ON app_sessions (user_id);
+    CREATE TABLE IF NOT EXISTS user_sync_snapshots (
+      user_id    TEXT PRIMARY KEY REFERENCES app_users(id),
+      blob       BLOB NOT NULL,
+      updated_at TEXT NOT NULL,
+      revision   INTEGER NOT NULL DEFAULT 1
+    );
     CREATE TABLE IF NOT EXISTS reference_events (
       id          TEXT PRIMARY KEY,
       kind        TEXT NOT NULL,
@@ -106,6 +127,113 @@ export function getServerDb(): DB {
 export function setServerDbForTests(db: DB): void {
   cached = db;
 }
+
+// ─── Server accounts + cross-device snapshots ─────────────────────────
+
+export interface ServerUser {
+  id: string;
+  username: string;
+  createdAt: string;
+}
+
+export interface UserSnapshot {
+  blob: Buffer;
+  updatedAt: string;
+  revision: number;
+}
+
+function passwordHash(password: string, salt = randomBytes(16).toString('hex')): string {
+  const derived = scryptSync(password, salt, 64).toString('hex');
+  return `scrypt$${salt}$${derived}`;
+}
+
+function passwordMatches(password: string, stored: string): boolean {
+  const [algorithm, salt, expected] = stored.split('$');
+  if (algorithm !== 'scrypt' || !salt || !expected) return false;
+  const actual = scryptSync(password, salt, 64).toString('hex');
+  return timingSafeEqual(Buffer.from(actual, 'hex'), Buffer.from(expected, 'hex'));
+}
+
+function toServerUser(row: { id: string; username: string; created_at: string }): ServerUser {
+  return { id: row.id, username: row.username, createdAt: row.created_at };
+}
+
+export function createServerUser(username: string, password: string): ServerUser {
+  const cleanUsername = username.trim();
+  if (cleanUsername.length < 2) throw new Error('username must be at least 2 characters');
+  if (password.length < 8) throw new Error('password must be at least 8 characters');
+  const user: ServerUser = {
+    id: randomUUID(),
+    username: cleanUsername,
+    createdAt: new Date().toISOString(),
+  };
+  try {
+    getServerDb()
+      .prepare('INSERT INTO app_users (id, username, password_hash, created_at) VALUES (?, ?, ?, ?)')
+      .run(user.id, user.username, passwordHash(password), user.createdAt);
+  } catch (error) {
+    if (error instanceof Error && /UNIQUE constraint failed/.test(error.message)) {
+      throw new Error('이미 사용 중인 사용자명입니다');
+    }
+    throw error;
+  }
+  return user;
+}
+
+export function authenticateUser(username: string, password: string): ServerUser | null {
+  const row = getServerDb()
+    .prepare('SELECT id, username, password_hash, created_at FROM app_users WHERE username = ? COLLATE NOCASE')
+    .get(username.trim()) as { id: string; username: string; password_hash: string; created_at: string } | undefined;
+  if (!row || !passwordMatches(password, row.password_hash)) return null;
+  return toServerUser(row);
+}
+
+export function createSession(userId: string): string {
+  const token = randomBytes(32).toString('base64url');
+  const tokenHash = createHash('sha256').update(token).digest('hex');
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString();
+  const db = getServerDb();
+  db.prepare('DELETE FROM app_sessions WHERE expires_at <= ?').run(now.toISOString());
+  db.prepare('INSERT INTO app_sessions (token_hash, user_id, expires_at, created_at) VALUES (?, ?, ?, ?)')
+    .run(tokenHash, userId, expiresAt, now.toISOString());
+  return token;
+}
+
+export function getSessionUser(token: string): ServerUser | null {
+  const tokenHash = createHash('sha256').update(token).digest('hex');
+  const row = getServerDb()
+    .prepare(
+      `SELECT u.id, u.username, u.created_at
+       FROM app_sessions s JOIN app_users u ON u.id = s.user_id
+       WHERE s.token_hash = ? AND s.expires_at > ?`,
+    )
+    .get(tokenHash, new Date().toISOString()) as { id: string; username: string; created_at: string } | undefined;
+  return row ? toServerUser(row) : null;
+}
+
+export const userSnapshotRepo = {
+  get(userId: string): UserSnapshot | null {
+    const row = getServerDb()
+      .prepare('SELECT blob, updated_at, revision FROM user_sync_snapshots WHERE user_id = ?')
+      .get(userId) as { blob: Buffer; updated_at: string; revision: number } | undefined;
+    return row ? { blob: row.blob, updatedAt: row.updated_at, revision: row.revision } : null;
+  },
+  put(userId: string, blob: Buffer): UserSnapshot {
+    const updatedAt = new Date().toISOString();
+    getServerDb()
+      .prepare(
+        `INSERT INTO user_sync_snapshots (user_id, blob, updated_at, revision)
+         VALUES (?, ?, ?, 1)
+         ON CONFLICT(user_id) DO UPDATE SET
+           blob = excluded.blob,
+           updated_at = excluded.updated_at,
+           revision = user_sync_snapshots.revision + 1`,
+      )
+      .run(userId, blob, updatedAt);
+    return this.get(userId)!;
+  },
+};
 
 // ─── Repos ────────────────────────────────────────────────────────────
 

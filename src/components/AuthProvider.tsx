@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { getCurrentUserId, logout as clearSession } from '@/lib/auth';
+import { getCurrentUserId, getServerSession, logout as clearSession, setCurrentUserId } from '@/lib/auth';
 import { familyRepo } from '@/lib/repos';
 import { syncThemeFromDb } from '@/hooks/useTheme';
 
@@ -41,6 +41,7 @@ import { ingestNativePendingSync } from '@/lib/nativeSync';
 import { initStatusBar } from '@/lib/statusBar';
 import { initBackButton } from '@/lib/backButton';
 import { registerServiceWorker } from '@/lib/serviceWorker';
+import { connectServerSession, uploadSyncSnapshot } from '@/lib/remoteSync';
 
 interface AuthValue {
   userId: string | null;
@@ -175,7 +176,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const RESUME_COOLDOWN_MS = 60 * 60 * 1000;
     const handler = () => {
       if (document.visibilityState === 'hidden') {
-        flushPersistDb();
+        flushPersistDb().then(() => {
+          const session = getServerSession();
+          if (session) return uploadSyncSnapshot(session);
+          return undefined;
+        }).catch((err) => console.warn('[AuthProvider] background sync skipped:', err));
         return;
       }
       if (document.visibilityState !== 'visible') return;
@@ -242,6 +247,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // No auto-seed — a missing session means the /login route gates
         // entry. Existing devices keep their stored loki0601 session until
         // explicit logout.
+        const serverSession = getServerSession();
+        if (serverSession) {
+          await connectServerSession(serverSession);
+        } else {
+          // Legacy local sessions remain on disk for the one-time migration,
+          // but cannot enter the app until they become a real server account.
+          setCurrentUserId(null);
+        }
         const userId = getCurrentUserId();
         if (!cancelled) {
           setState({
@@ -410,6 +423,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     })();
     return () => {
       cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const schedule = () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        const session = getServerSession();
+        if (session) uploadSyncSnapshot(session).catch((err) =>
+          console.warn('[AuthProvider] automatic sync skipped:', err),
+        );
+      }, 1_500);
+    };
+    window.addEventListener('assetflow:local-data-changed', schedule);
+    return () => {
+      window.removeEventListener('assetflow:local-data-changed', schedule);
+      if (timer) clearTimeout(timer);
     };
   }, []);
 
