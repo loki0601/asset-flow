@@ -51,7 +51,9 @@ export async function flushChangeOutbox(userId: string): Promise<void> {
     const result = body.results[index];
     if (result?.ok && result.version != null && result.cursor != null) {
       state.versions[versionKey(change.collection, change.entityId)] = result.version;
-      state.cursor = Math.max(state.cursor, result.cursor);
+      // Do not advance the pull cursor here. A concurrently committed remote
+      // change can have an earlier cursor than this acknowledgement; skipping
+      // directly to our cursor would permanently miss that remote change.
     }
   });
   const conflicts = submitted.filter((change, index) => !body.results[index]?.ok);
@@ -81,6 +83,16 @@ function reapplyHoldingConflicts(userId: string, conflicts: PendingChange[], sub
     const trade = transactions.find((tx) => tx.accountId === (original?.accountId ?? remote?.accountId) && tx.symbol === (original?.symbol ?? remote?.symbol));
     if (!remote || !trade || !trade.quantity) continue;
     const rebased = rebaseHoldingFromTransaction(remote, trade);
+    // The old pending mutation still carries the stale base version. Remove
+    // precisely that operation before queuing the rebased value, so the
+    // retry uses the version learned from the forced pull.
+    const state = syncState(userId);
+    state.outbox = state.outbox.filter((pending) => !(
+      pending.collection === conflict.collection
+      && pending.entityId === conflict.entityId
+      && pending.clientUpdatedAt === conflict.clientUpdatedAt
+    ));
+    writeJSON(stateKey(userId), state);
     if (rebased) {
       const rows = readJSON<Holding[]>(userKey(userId, 'holdings'), []);
       writeJSON(userKey(userId, 'holdings'), rows.map((row) => row.id === rebased.id ? rebased : row));
