@@ -25,11 +25,18 @@
   <key>ProgramArguments</key>
   <array>
     <string>/bin/bash</string>
-    <string>__PROJECT_DIR__/scripts/push-today-insights.sh</string>
+    <string>__LAUNCHER_PATH__</string>
+    <string>push-today-insights</string>
   </array>
 
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>ASSETFLOW_PROJECT_DIR</key>
+    <string>__PROJECT_DIR__</string>
+  </dict>
+
   <key>WorkingDirectory</key>
-  <string>__PROJECT_DIR__</string>
+  <string>__HOME_DIR__</string>
 
   <key>StartCalendarInterval</key>
   <dict>
@@ -40,9 +47,9 @@
   </dict>
 
   <key>StandardOutPath</key>
-  <string>__PROJECT_DIR__/data/push-today-insights.log</string>
+  <string>/tmp/com.assetflow.push-today-insights.log</string>
   <key>StandardErrorPath</key>
-  <string>__PROJECT_DIR__/data/push-today-insights.log</string>
+  <string>/tmp/com.assetflow.push-today-insights.log</string>
 
   <key>RunAtLoad</key>
   <false/>

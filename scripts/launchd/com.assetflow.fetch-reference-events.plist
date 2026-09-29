@@ -25,12 +25,19 @@
 
   <key>ProgramArguments</key>
   <array>
-    <string>__PROJECT_DIR__/.venv/bin/python</string>
-    <string>__PROJECT_DIR__/scripts/fetch-reference-events.py</string>
+    <string>/bin/bash</string>
+    <string>__LAUNCHER_PATH__</string>
+    <string>fetch-reference-events</string>
   </array>
 
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>ASSETFLOW_PROJECT_DIR</key>
+    <string>__PROJECT_DIR__</string>
+  </dict>
+
   <key>WorkingDirectory</key>
-  <string>__PROJECT_DIR__</string>
+  <string>__HOME_DIR__</string>
 
   <key>StartCalendarInterval</key>
   <dict>
@@ -41,9 +48,9 @@
   </dict>
 
   <key>StandardOutPath</key>
-  <string>__PROJECT_DIR__/data/fetch-reference-events.log</string>
+  <string>/tmp/com.assetflow.fetch-reference-events.log</string>
   <key>StandardErrorPath</key>
-  <string>__PROJECT_DIR__/data/fetch-reference-events.log</string>
+  <string>/tmp/com.assetflow.fetch-reference-events.log</string>
 
   <key>RunAtLoad</key>
   <false/>

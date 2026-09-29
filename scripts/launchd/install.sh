@@ -10,7 +10,11 @@ set -euo pipefail
 
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 LAUNCH_DIR="$HOME/Library/LaunchAgents"
-mkdir -p "$LAUNCH_DIR"
+LAUNCHER_DIR="$HOME/Library/Application Support/AssetFlow"
+LAUNCHER_PATH="$LAUNCHER_DIR/assetflow-launch.sh"
+UID_VALUE="$(id -u)"
+mkdir -p "$LAUNCH_DIR" "$LAUNCHER_DIR"
+install -m 700 "$PROJECT_DIR/scripts/launchd/assetflow-launch.sh" "$LAUNCHER_PATH"
 
 install_one() {
   local label="$1"
@@ -22,12 +26,14 @@ install_one() {
     return
   fi
 
-  sed "s|__PROJECT_DIR__|$PROJECT_DIR|g" "$src" > "$dest"
+  sed \
+    -e "s|__PROJECT_DIR__|$PROJECT_DIR|g" \
+    -e "s|__LAUNCHER_PATH__|$LAUNCHER_PATH|g" \
+    -e "s|__HOME_DIR__|$HOME|g" \
+    "$src" > "$dest"
 
-  if launchctl list | grep -q "$label"; then
-    launchctl unload "$dest" 2>/dev/null || true
-  fi
-  launchctl load "$dest"
+  launchctl bootout "gui/${UID_VALUE}/${label}" 2>/dev/null || true
+  launchctl bootstrap "gui/${UID_VALUE}" "$dest"
   echo "installed: $dest"
 }
 
