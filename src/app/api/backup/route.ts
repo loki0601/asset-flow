@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getServerDb } from '@/server/db';
+import { getRequestUser } from '@/server/requestAuth';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -10,9 +11,8 @@ const MAX_BLOB_BYTES = 50 * 1024 * 1024; // 50 MB ceiling — sql.js blob is
 /**
  * Server-side backup of the client's sql.js DB blob.
  *
- * POST: client sends the raw blob bytes (application/octet-stream) plus
- * x-user-id (required) and optional x-username headers. The blob is stored
- * verbatim in server.db.user_backups along with a creation timestamp.
+ * POST: client sends the raw blob bytes (application/octet-stream) with a
+ * bearer session. The server derives the user identity from that session.
  * Latest MAX_BACKUPS_PER_USER kept per user; older ones are pruned in the
  * same transaction to keep storage bounded.
  *
@@ -21,11 +21,8 @@ const MAX_BLOB_BYTES = 50 * 1024 * 1024; // 50 MB ceiling — sql.js blob is
  * for the IndexedDB blob.
  */
 export async function POST(request: Request) {
-  const userId = request.headers.get('x-user-id');
-  const username = request.headers.get('x-username') || null;
-  if (!userId) {
-    return NextResponse.json({ error: 'x-user-id required' }, { status: 400 });
-  }
+  const user = getRequestUser(request);
+  if (!user) return NextResponse.json({ error: '로그인이 필요합니다.' }, { status: 401 });
 
   const buf = Buffer.from(await request.arrayBuffer());
   if (buf.length === 0) {
@@ -55,8 +52,8 @@ export async function POST(request: Request) {
   );
 
   const txn = db.transaction(() => {
-    const result = insert.run(userId, username, createdAt, buf.length, buf);
-    prune.run(userId, userId, MAX_BACKUPS_PER_USER);
+    const result = insert.run(user.id, user.username, createdAt, buf.length, buf);
+    prune.run(user.id, user.id, MAX_BACKUPS_PER_USER);
     return result.lastInsertRowid as number | bigint;
   });
   const id = txn();
@@ -64,8 +61,8 @@ export async function POST(request: Request) {
   return NextResponse.json(
     {
       id: Number(id),
-      userId,
-      username,
+      userId: user.id,
+      username: user.username,
       createdAt,
       blobSize: buf.length,
     },
@@ -74,20 +71,17 @@ export async function POST(request: Request) {
 }
 
 export async function GET(request: Request) {
-  const url = new URL(request.url);
-  const userId = url.searchParams.get('userId') ?? request.headers.get('x-user-id');
-  if (!userId) {
-    return NextResponse.json({ error: 'userId required' }, { status: 400 });
-  }
+  const user = getRequestUser(request);
+  if (!user) return NextResponse.json({ error: '로그인이 필요합니다.' }, { status: 401 });
   const db = getServerDb();
   const rows = db
     .prepare(
       'SELECT id, username, created_at, blob_size FROM user_backups WHERE user_id = ? ORDER BY created_at DESC LIMIT 20',
     )
-    .all(userId) as Array<{ id: number; username: string | null; created_at: string; blob_size: number }>;
+    .all(user.id) as Array<{ id: number; username: string | null; created_at: string; blob_size: number }>;
   return NextResponse.json(
     {
-      userId,
+      userId: user.id,
       backups: rows.map((r) => ({
         id: r.id,
         username: r.username,

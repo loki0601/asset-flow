@@ -6,6 +6,7 @@
  */
 
 import { getDb, flushPersistDb } from '@/lib/db';
+import { getServerSession } from '@/lib/auth';
 
 export interface BackupAck {
   id: number;
@@ -29,7 +30,9 @@ export async function uploadBackup(opts: UploadOpts): Promise<BackupAck> {
   await flushPersistDb();
   const u8 = getDb().export();
   const body = new Blob([u8 as BlobPart], { type: 'application/octet-stream' });
-  return xhrUploadBackup(body, opts);
+  const session = getServerSession();
+  if (!session) throw new Error('서버 로그인 후 백업할 수 있습니다.');
+  return xhrUploadBackup(body, opts, session.token);
 }
 
 /**
@@ -37,7 +40,7 @@ export async function uploadBackup(opts: UploadOpts): Promise<BackupAck> {
  * events, but the settings UI needs real progress feedback so the user
  * isn't staring at an indefinite spinner.
  */
-function xhrUploadBackup(body: Blob, opts: UploadOpts): Promise<BackupAck> {
+function xhrUploadBackup(body: Blob, opts: UploadOpts, token: string): Promise<BackupAck> {
   const { userId, username, onProgress, timeoutMs = 120_000 } = opts;
   return new Promise<BackupAck>((resolve, reject) => {
     const xhr = new XMLHttpRequest();
@@ -67,8 +70,7 @@ function xhrUploadBackup(body: Blob, opts: UploadOpts): Promise<BackupAck> {
     xhr.timeout = timeoutMs;
     xhr.open('POST', '/api/backup');
     xhr.setRequestHeader('Content-Type', 'application/octet-stream');
-    xhr.setRequestHeader('x-user-id', userId);
-    if (username) xhr.setRequestHeader('x-username', username);
+    xhr.setRequestHeader('Authorization', `Bearer ${token}`);
     xhr.send(body);
   });
 }
