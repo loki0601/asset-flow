@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { getCurrentUserId, getServerSession, logout as clearSession, setCurrentUserId } from '@/lib/auth';
+import { getServerSession, logout as clearSession } from '@/lib/auth';
 import { familyRepo } from '@/lib/repos';
 import { syncThemeFromDb } from '@/hooks/useTheme';
 
@@ -41,8 +41,8 @@ import { ingestNativePendingSync } from '@/lib/nativeSync';
 import { initStatusBar } from '@/lib/statusBar';
 import { initBackButton } from '@/lib/backButton';
 import { registerServiceWorker } from '@/lib/serviceWorker';
-import { connectServerSession } from '@/lib/remoteSync';
-import { flushChangeOutbox, pullChangeFeed, seedChangeFeed } from '@/lib/changeSync';
+import { resolveBootSession } from '@/lib/bootAuth';
+import { flushChangeOutbox, pullChangeFeed } from '@/lib/changeSync';
 
 interface AuthValue {
   userId: string | null;
@@ -273,23 +273,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         syncThemeFromDb();
         // No auto-seed — a missing session means the /login route gates
         // entry. Existing devices keep their stored loki0601 session until
-        // explicit logout.
-        const serverSession = getServerSession();
-        if (serverSession) {
-          await connectServerSession(serverSession);
-        } else {
-          // Legacy local sessions remain on disk for the one-time migration,
-          // but cannot enter the app until they become a real server account.
-          setCurrentUserId(null);
-        }
-        const userId = getCurrentUserId();
-        if (userId) {
-          // Snapshots are only the one-time migration/first-device bootstrap.
-          // All later portfolio writes travel through the append-only change feed.
-          seedChangeFeed(userId);
-          await flushChangeOutbox(userId);
-          await pullChangeFeed(userId);
-        }
+        // explicit logout. resolveBootSession isolates the network-dependent
+        // sync (server snapshot exchange, change-feed flush/pull) from the
+        // auth decision itself: a Cloudflare-tunnel hiccup on a mobile cold
+        // start must never be mistaken for a logout, since the on-disk
+        // session is still perfectly valid regardless of whether today's
+        // sync round-trip succeeds.
+        const userId = await resolveBootSession();
         if (!cancelled) {
           setState({
             userId,

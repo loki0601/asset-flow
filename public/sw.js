@@ -33,7 +33,11 @@
 // VERSION forces every client to drop that cache and re-fetch fresh HTML/JS
 // on next boot. Bump this again whenever a client-side fix must reach
 // existing installs immediately rather than on their next lucky fast fetch.
-const VERSION = 'v7';
+// Bumped 2026-09-30: client-side fix for a false "logged out" bounce
+// (AuthProvider's boot effect treated any network failure during boot sync
+// as "no session" — see src/lib/bootAuth.ts). Must reach existing installs
+// immediately.
+const VERSION = 'v8';
 const CACHE = `assetflow-${VERSION}`;
 
 // Navigation network deadline. Long enough for a healthy tunnel round trip,
