@@ -121,31 +121,67 @@ def fetch_fx_rates() -> dict[str, float]:
         return {}
 
 
+NAVER_GOLD_URL = (
+    "https://api.stock.naver.com/marketindex/metals/M04020000/prices?page={page}&pageSize={size}"
+)
+
+
+def _num(s: object) -> float:
+    return float(str(s).replace(",", ""))
+
+
+def parse_naver_gold_prices(payload: object) -> list[dict]:
+    """Naver 국내 금 (KRX 금현물, KRW/g) daily rows → [{date, close, change,
+    changePct}], newest first. Malformed rows are skipped."""
+    if not isinstance(payload, list):
+        return []
+    out: list[dict] = []
+    for r in payload:
+        try:
+            date = str(r["localTradedAt"])[:10]
+            close = _num(r["closePrice"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        if len(date) != 10 or close <= 0:
+            continue
+        try:
+            change = _num(r.get("fluctuations", 0))
+            pct = _num(r.get("fluctuationsRatio", 0))
+        except ValueError:
+            change, pct = 0.0, 0.0
+        out.append({"date": date, "close": close, "change": change, "changePct": pct})
+    return out
+
+
+def fetch_naver_gold_rows(page: int = 1, size: int = 20) -> list[dict]:
+    req = urllib.request.Request(
+        NAVER_GOLD_URL.format(page=page, size=size), headers={"User-Agent": "Mozilla/5.0"}
+    )
+    return parse_naver_gold_prices(json.loads(urllib.request.urlopen(req, timeout=15).read()))
+
+
 def fetch_krx_gold(prices: dict[str, dict]) -> None:
-    """KRX 금현물 (매매기준율, KRW/g) via Naver finance daily quotes. Same
-    source as the backfill so the running total is consistent."""
-    url = "https://finance.naver.com/marketindex/goldDailyQuote.naver?page=1"
+    """KRX 금현물 (KRW/g) via Naver's market-index JSON API. The legacy HTML
+    page (goldDailyQuote.naver) returns HTTP 410 since 2026-09-18."""
     try:
-        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-        html = urllib.request.urlopen(req, timeout=15).read().decode("euc-kr", errors="replace")
+        rows = fetch_naver_gold_rows()
     except Exception as e:
         print(f"  KRX:GOLD fetch failed: {e}", file=sys.stderr)
         return
-    matches = re.findall(
-        r'<td class="date">([\d.]+)</td>\s*<td class="num">([\d,\.]+)</td>\s*<td class="num">[^<]*<img[^>]*alt="(상승|하락)"[^>]*>\s*([\d,\.]+)',
-        html,
-    )
-    if not matches:
+    if not rows:
         print("  KRX:GOLD: no rows parsed", file=sys.stderr)
         return
-    latest_date, latest_price, direction, change = matches[0]
-    price = float(latest_price.replace(",", ""))
-    raw_change = float(change.replace(",", ""))
-    change_signed = -raw_change if direction == "하락" else raw_change
-    prev_close = price - change_signed
-    pct = (change_signed / prev_close * 100.0) if prev_close > 0 else 0.0
-    prices["KRX:GOLD"] = {"price": price, "change": change_signed, "changePct": pct}
-    print(f"  KRX:GOLD: {price} (Δ {change_signed:+.2f}, {pct:+.2f}%, as of {latest_date})", file=sys.stderr)
+    latest = rows[0]
+    prices["KRX:GOLD"] = {
+        "price": latest["close"],
+        "change": latest["change"],
+        "changePct": latest["changePct"],
+    }
+    print(
+        f"  KRX:GOLD: {latest['close']} (Δ {latest['change']:+.2f}, "
+        f"{latest['changePct']:+.2f}%, as of {latest['date']})",
+        file=sys.stderr,
+    )
 
 
 def fetch_us_tracked(prices: dict[str, dict]) -> None:

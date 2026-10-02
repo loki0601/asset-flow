@@ -26,6 +26,10 @@ import time
 import traceback
 import urllib.parse
 import urllib.request
+from datetime import date, timedelta
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
@@ -116,34 +120,25 @@ def src_yfinance(ticker: str, start: str, end: str) -> list[dict]:
 
 
 def src_naver_krx_gold(years: int) -> list[dict]:
-    """Scrape Naver finance daily quotes for KRX 금현물 (매매기준율 = KRW/g).
+    """KRX 금현물 (KRW/g) daily closes via Naver's market-index JSON API —
+    the same source fetch-prices.py uses for the daily close. Pages are
+    newest first; stops once `years` of history is covered."""
+    import importlib
 
-    Public, no auth required. Pages are descending (newest first), 10 rows
-    each. Stops once we cover `years` worth of pages (~36 pages per year).
-    """
-    import re
-
+    fp = importlib.import_module("fetch-prices")
+    cutoff = (date.today() - timedelta(days=365 * years)).isoformat()
     rows: list[dict] = []
-    max_pages = years * 38  # slight buffer over 36 weekdays-only pages/yr
-    for page in range(1, max_pages + 1):
-        url = f"https://finance.naver.com/marketindex/goldDailyQuote.naver?page={page}"
-        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+    for page in range(1, years * 20 + 2):
         try:
-            html = urllib.request.urlopen(req, timeout=15).read().decode("euc-kr", errors="replace")
+            batch = fp.fetch_naver_gold_rows(page=page, size=20)
         except Exception as e:
             print(f"[naver-gold] page {page} fail: {e}", file=sys.stderr)
             break
-        matches = re.findall(
-            r'<td class="date">([\d.]+)</td>\s*<td class="num">([\d,\.]+)</td>',
-            html,
-        )
-        if not matches:
+        if not batch:
             break
-        for d, p in matches:
-            iso = d.replace(".", "-")
-            close = float(p.replace(",", ""))
-            if close > 0:
-                rows.append({"date": iso, "close": close})
+        rows.extend({"date": r["date"], "close": r["close"]} for r in batch)
+        if batch[-1]["date"] < cutoff:
+            break
     return rows
 
 
