@@ -3,14 +3,13 @@
  * patches the locally-cached catalog (price fields only) without touching
  * the catalog version or running migrations.
  *
- * When given a list of held symbols, also reconciles the local
- * price_history table with the server's history feed:
- *   - 0 local rows           → GET /api/prices/history (full backfill)
- *   - local_max = latest BD  → skip
- *   - 1 BD gap               → append today's close from the bulk payload
- *   - 2+ BD gap              → backfill missing rows via /api/prices/history
- *                              starting at the first missing business day
- *                              (covers users who skipped a day or more)
+ * When given a list of held symbols, also mirrors the server's history feed
+ * into the local price_history table (the server is the only source of
+ * truth — the client never fabricates rows):
+ *   - no current deep-backfill flag → purge local rows, full refetch
+ *   - otherwise                     → refetch from localMax INCLUSIVE, so a
+ *                                     live intraday tick on the last date is
+ *                                     replaced by the official close
  */
 
 import { kvGet, kvSet } from '@/lib/db';
@@ -22,13 +21,13 @@ import type { MarketAsset } from '@/lib/schema';
 const ASSETS_KEY = 'assetflow:catalog:assets';
 const LAST_SYNC_KEY = 'assetflow:prices:lastSyncAt';
 const FULL_BACKFILL_FROM = '2016-01-01';
-// Per-symbol kv flag set after a deep fetch from FULL_BACKFILL_FROM has
-// succeeded once. Without it the gap-fast-path forever asks
-// `from=localMax+1`, which leaves users who entered tracking late (only a
-// few cron-appended rows in local storage) permanently missing the
-// historical backfill that the server has since populated.
+// Per-symbol kv flag set after a purge + deep fetch from FULL_BACKFILL_FROM
+// has succeeded. Versioned: bumping the suffix forces every client to drop
+// its local history once and re-mirror the server. v2 = the 2026-10 repair
+// (intraday ticks stored as closes, weekend/holiday copies, US closes
+// stamped with the next KST date).
 const fullBackfillFlagKey = (symbol: string) =>
-  `assetflow:priceHistory:fullBackfilled:${symbol}`;
+  `assetflow:priceHistory:fullBackfilled:v2:${symbol}`;
 
 function isFullBackfilled(symbol: string): boolean {
   return kvGet(fullBackfillFlagKey(symbol)) === '1';
@@ -107,72 +106,21 @@ export function trackSymbolHistory(symbol: string, fetchImpl: typeof fetch = fet
   });
 }
 
-/**
- * Compute the business-day gap between `localMax` and `latest`, using the
- * supplied business-day list. Returns:
- *   - 0  : already in sync
- *   - 1  : exactly one business day behind
- *   - 2+ : multi-day gap (or no overlap with the BD list)
- */
-function businessDayGap(localMax: string, latest: string, businessDays: string[]): number {
-  if (localMax === latest) return 0;
-  const iLocal = businessDays.indexOf(localMax);
-  const iLatest = businessDays.indexOf(latest);
-  if (iLocal < 0 || iLatest < 0) return 2; // treat unknown as "big gap"
-  return iLatest - iLocal;
-}
-
-async function syncHistoryFor(
-  symbol: string,
-  payload: PricePayload,
-  fetchImpl: typeof fetch,
-): Promise<void> {
-  const businessDays = payload.recentBusinessDays ?? [];
-  const latest = businessDays.length > 0 ? businessDays[businessDays.length - 1] : null;
+async function syncHistoryFor(symbol: string, fetchImpl: typeof fetch): Promise<void> {
   const localMax = priceHistoryRepo.getMaxDate(symbol);
-
-  if (localMax === null || !isFullBackfilled(symbol)) {
-    // First sync, or a previous client only filled the recent days (e.g.
-    // daily-cron appends without backfill). Pull the full range from the
-    // server. Server may still be backfilling, in which case status≠ready
-    // and we just leave it for next time without marking the flag.
-    const res = await fetchImpl(
-      `/api/prices/history?symbol=${encodeURIComponent(symbol)}&from=${FULL_BACKFILL_FROM}`,
-    );
-    if (!res.ok) return;
-    const data = (await res.json()) as HistoryResp;
-    if (data.status === 'ready' && data.rows.length > 0) {
-      priceHistoryRepo.append(symbol, data.rows);
-      markFullBackfilled(symbol);
-    }
-    return;
-  }
-
-  if (!latest) return; // No business-day list — can't reason about gap
-  const gap = businessDayGap(localMax, latest, businessDays);
-  if (gap === 0) return;
-  if (gap === 1) {
-    const todays = payload.prices[symbol];
-    if (todays && todays.price > 0) {
-      priceHistoryRepo.append(symbol, [{ date: latest, close: todays.price }]);
-    }
-    return;
-  }
-
-  // gap >= 2 — backfill the missing window from the server. Use the next
-  // business day after localMax as `from` so the call returns only the
-  // missing rows (priceHistoryRepo dedupes via UPSERT either way, but a
-  // tight window keeps the response small).
-  const iLocal = businessDays.indexOf(localMax);
-  const fromDate = iLocal >= 0 && iLocal + 1 < businessDays.length ? businessDays[iLocal + 1] : localMax;
+  const deep = localMax === null || !isFullBackfilled(symbol);
+  const from = deep ? FULL_BACKFILL_FROM : localMax;
   const res = await fetchImpl(
-    `/api/prices/history?symbol=${encodeURIComponent(symbol)}&from=${fromDate}`,
+    `/api/prices/history?symbol=${encodeURIComponent(symbol)}&from=${from}`,
   );
   if (!res.ok) return;
   const data = (await res.json()) as HistoryResp;
-  if (data.status === 'ready' && data.rows.length > 0) {
-    priceHistoryRepo.append(symbol, data.rows);
-  }
+  // Server may still be backfilling (status≠ready) — leave the local cache
+  // untouched and retry next sync.
+  if (data.status !== 'ready' || data.rows.length === 0) return;
+  if (deep) priceHistoryRepo.deleteSymbol(symbol);
+  priceHistoryRepo.append(symbol, data.rows);
+  if (deep) markFullBackfilled(symbol);
 }
 
 /**
@@ -212,7 +160,7 @@ export async function syncPrices(
   // count is bounded by user holdings (typically < 50).
   for (const symbol of new Set(historySymbols)) {
     try {
-      await syncHistoryFor(symbol, data, fetchImpl);
+      await syncHistoryFor(symbol, fetchImpl);
     } catch (err) {
       console.warn('[syncPrices] history sync failed for', symbol, err);
     }

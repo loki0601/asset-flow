@@ -36,8 +36,10 @@ import sys
 import urllib.request
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 KST = timezone(timedelta(hours=9))
+ET = ZoneInfo("America/New_York")
 DB_PATH = Path(__file__).resolve().parents[1] / "data/server.db"
 
 
@@ -83,13 +85,24 @@ def in_live_window(symbol: str, now: datetime) -> bool:
 
 
 def live_date(symbol: str, now: datetime) -> str:
-    kst = now.astimezone(KST)
-    if classify(symbol) != "US":
-        return kst.date().isoformat()
-    minutes = kst.hour * 60 + kst.minute
-    if minutes >= 22 * 60 + 30:
-        return (kst.date() + timedelta(days=1)).isoformat()
-    return kst.date().isoformat()
+    """Trading date a live tick belongs to: US ticks by the US/Eastern session
+    date (matches the yfinance-dated official closes), everything else KST."""
+    if classify(symbol) == "US":
+        return now.astimezone(ET).date().isoformat()
+    return now.astimezone(KST).date().isoformat()
+
+
+def parse_naver_sise(body: str) -> tuple[float, str] | None:
+    """Naver siseJson day row → (close, YYYY-MM-DD of that row). Intraday the
+    close column is the live price; on a holiday the row is the last trading
+    day, so the tick is labelled with that day instead of the holiday."""
+    m = re.search(
+        r'\[\s*"(\d{4})(\d{2})(\d{2})"\s*,\s*[\d\.]+\s*,\s*[\d\.]+\s*,\s*[\d\.]+\s*,\s*([\d\.]+)',
+        body,
+    )
+    if not m:
+        return None
+    return float(m.group(4)), f"{m.group(1)}-{m.group(2)}-{m.group(3)}"
 
 
 # ─── Upstream fetchers ─────────────────────────────────────────────────
@@ -133,25 +146,26 @@ def fetch_us(symbols: list[str]) -> dict[str, float]:
         return {}
 
 
-def fetch_krx(symbols: list[str]) -> dict[str, float]:
-    """Naver finance live JSON per ticker. KRX:005930 → code 005930."""
-    out: dict[str, float] = {}
+def fetch_krx(symbols: list[str]) -> dict[str, tuple[float, str]]:
+    """Naver live quotes per ticker → {symbol: (price, trading date)}."""
+    out: dict[str, tuple[float, str]] = {}
     headers = {
         "User-Agent": "Mozilla/5.0 AssetFlow/1.0",
         "Referer": "https://finance.naver.com/",
     }
     for s in symbols:
         if s == "KRX:GOLD":
-            # Naver finance gold daily-quote scrape — same as cron path.
             try:
                 req = urllib.request.Request(
-                    "https://finance.naver.com/marketindex/goldDailyQuote.naver",
+                    "https://api.stock.naver.com/marketindex/metals/M04020000/prices?page=1&pageSize=1",
                     headers=headers,
                 )
-                html = urllib.request.urlopen(req, timeout=8).read().decode("euc-kr", errors="replace")
-                m = re.search(r'<td class="num">([\d,\.]+)</td>', html)
-                if m:
-                    out[s] = float(m.group(1).replace(",", ""))
+                rows = json.loads(urllib.request.urlopen(req, timeout=8).read())
+                if rows:
+                    out[s] = (
+                        float(str(rows[0]["closePrice"]).replace(",", "")),
+                        str(rows[0]["localTradedAt"])[:10],
+                    )
             except Exception as e:
                 print(f"  KRX:GOLD live failed: {e}", file=sys.stderr)
             continue
@@ -160,15 +174,9 @@ def fetch_krx(symbols: list[str]) -> dict[str, float]:
             url = f"https://api.finance.naver.com/siseJson.naver?symbol={code}&requestType=0&count=1&timeframe=day"
             req = urllib.request.Request(url, headers=headers)
             body = urllib.request.urlopen(req, timeout=6).read().decode("euc-kr", errors="replace")
-            # Response columns: [date, open, high, low, CLOSE, volume, foreign%].
-            # During intraday the "close" column is the live current price,
-            # which is what we want — not the open.
-            m = re.search(
-                r'\[\s*"\d{8}"\s*,\s*[\d\.]+\s*,\s*[\d\.]+\s*,\s*[\d\.]+\s*,\s*([\d\.]+)',
-                body,
-            )
-            if m:
-                out[s] = float(m.group(1))
+            parsed = parse_naver_sise(body)
+            if parsed:
+                out[s] = parsed
         except Exception as e:
             print(f"  KRX {code} live failed: {e}", file=sys.stderr)
     return out
@@ -239,40 +247,30 @@ def main() -> int:
             continue
         eligible[kind].append(s)
 
-    live_prices = {}
+    # {symbol: (price, trading date)}
+    live_prices: dict[str, tuple[float, str]] = {}
     if eligible["US"]:
-        live_prices.update(fetch_us(eligible["US"]))
+        live_prices.update({s: (px, live_date(s, now)) for s, px in fetch_us(eligible["US"]).items()})
     if eligible["KRX"]:
         live_prices.update(fetch_krx(eligible["KRX"]))
     if eligible["CRYPTO"]:
-        live_prices.update(fetch_crypto(eligible["CRYPTO"]))
+        live_prices.update({s: (px, live_date(s, now)) for s, px in fetch_crypto(eligible["CRYPTO"]).items()})
 
-    # Upsert into price_history, compute dailyChange via previous_close.
+    # Read-only against server history: ticks are NOT persisted there. The
+    # server's price_history holds official closes only — a stored intraday
+    # tick used to survive as that day's "close" because the close jobs could
+    # not overwrite it. Clients keep the tick locally and re-mirror the server.
+    result: dict[str, dict] = {}
     conn = sqlite3.connect(str(DB_PATH))
     try:
-        conn.execute(
-            "CREATE TABLE IF NOT EXISTS price_history ("
-            "symbol TEXT NOT NULL, date TEXT NOT NULL, close REAL NOT NULL, "
-            "PRIMARY KEY (symbol, date))"
-        )
-        result: dict[str, dict] = {}
-        for sym, px in live_prices.items():
-            d = live_date(sym, now)
-            prev = previous_close(conn, sym, d) or px
+        for sym, (px, d) in live_prices.items():
+            try:
+                prev = previous_close(conn, sym, d) or px
+            except sqlite3.Error:
+                prev = px
             change = px - prev
             change_pct = (change / prev) * 100 if prev else 0.0
-            conn.execute(
-                "INSERT INTO price_history (symbol, date, close) VALUES (?, ?, ?) "
-                "ON CONFLICT(symbol, date) DO UPDATE SET close = excluded.close",
-                (sym, d, px),
-            )
-            result[sym] = {
-                "price": px,
-                "change": change,
-                "changePct": change_pct,
-                "date": d,
-            }
-        conn.commit()
+            result[sym] = {"price": px, "change": change, "changePct": change_pct, "date": d}
     finally:
         conn.close()
 

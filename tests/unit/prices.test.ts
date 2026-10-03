@@ -186,7 +186,11 @@ describe('syncPrices — history sync (held symbols)', () => {
     expect(priceHistoryRepo.listSince('KRX:A', '2026-01-01')).toHaveLength(3);
   });
 
-  it('1-business-day gap → appends today\'s close from bulk payload (no /api/prices/history call)', async () => {
+  // The client used to fabricate "today's" row from the bulk payload under the
+  // latest KRX business day — for US symbols that stamped a KST date on a US
+  // close, and on weekends/holidays it copied the previous close. The server
+  // history is the single source of truth now; the client only mirrors it.
+  it('never fabricates a row from the bulk payload — mirrors server history only', async () => {
     setLocalCatalog('1.0.0', [asset('KRX:A')]);
     priceHistoryRepo.append('KRX:A', [
       { date: '2026-05-13', close: 1080 },
@@ -194,43 +198,118 @@ describe('syncPrices — history sync (held symbols)', () => {
     ]);
     markFullBackfilled('KRX:A');
 
-    // history handler intentionally throws if hit — to assert no call made
-    let historyCalled = false;
-    const fetch = (async (input: RequestInfo | URL) => {
-      const url = String(input);
-      if (url.startsWith('/api/prices/history')) {
-        historyCalled = true;
-        return new Response('{"rows":[]}', { status: 200 });
-      }
-      return new Response(JSON.stringify(pricesPayload()), { status: 200 });
-    }) as unknown as typeof fetch;
+    const fetch = multiFetch({
+      prices: pricesPayload(),
+      history: { 'KRX:A': { symbol: 'KRX:A', status: 'ready', rows: [{ date: '2026-05-14', close: 1090 }] } },
+    });
 
     await syncPrices(fetch, ['KRX:A']);
 
-    expect(historyCalled).toBe(false);
-    expect(priceHistoryRepo.getMaxDate('KRX:A')).toBe('2026-05-15');
-    const last = priceHistoryRepo.listSince('KRX:A', '2026-05-15');
-    expect(last).toEqual([{ date: '2026-05-15', close: todayClose }]);
+    // Server has no 05-15 row yet (before the 15:35 close job) → none locally.
+    expect(priceHistoryRepo.getMaxDate('KRX:A')).toBe('2026-05-14');
   });
 
-  it('already in sync (local_max == latest business day) → no-op', async () => {
+  // A live intraday tick is stored under today's date; the official close for
+  // that date lands on the server later. Re-requesting from localMax
+  // (inclusive) is what replaces the tick with the real close.
+  it('refreshes from localMax inclusive so a stale intraday tick is replaced by the official close', async () => {
     setLocalCatalog('1.0.0', [asset('KRX:A')]);
-    priceHistoryRepo.append('KRX:A', [{ date: '2026-05-15', close: 1100 }]);
+    priceHistoryRepo.append('KRX:A', [
+      { date: '2026-05-13', close: 1080 },
+      { date: '2026-05-14', close: 1095 }, // intraday tick
+    ]);
     markFullBackfilled('KRX:A');
 
-    let historyCalled = false;
+    const urls: string[] = [];
     const fetch = (async (input: RequestInfo | URL) => {
       const url = String(input);
       if (url.startsWith('/api/prices/history')) {
-        historyCalled = true;
+        urls.push(url);
+        return new Response(
+          JSON.stringify({
+            symbol: 'KRX:A',
+            status: 'ready',
+            rows: [
+              { date: '2026-05-14', close: 1090 },
+              { date: '2026-05-15', close: 1100 },
+            ],
+          }),
+          { status: 200 },
+        );
       }
       return new Response(JSON.stringify(pricesPayload()), { status: 200 });
     }) as unknown as typeof fetch;
 
     await syncPrices(fetch, ['KRX:A']);
 
-    expect(historyCalled).toBe(false);
-    expect(priceHistoryRepo.listSince('KRX:A', '2026-01-01')).toHaveLength(1);
+    expect(urls[0]).toContain('from=2026-05-14');
+    expect(priceHistoryRepo.listSince('KRX:A', '2026-05-14')).toEqual([
+      { date: '2026-05-14', close: 1090 },
+      { date: '2026-05-15', close: 1100 },
+    ]);
+  });
+
+  // Caches filled before the 2026-10 history repair hold rows the server no
+  // longer has (weekend copies, US closes shifted onto the next KST date,
+  // intraday ticks). A one-time purge + full refetch drops them.
+  it('purges a legacy local cache once and refetches full history, dropping rows the server no longer has', async () => {
+    setLocalCatalog('1.0.0', [asset('NASDAQ:A')]);
+    priceHistoryRepo.append('NASDAQ:A', [
+      { date: '2026-05-14', close: 99 },
+      { date: '2026-05-16', close: 101 }, // Saturday copy / shifted date
+    ]);
+    // Legacy (pre-repair) deep-backfill flag only — not the current one.
+    const { kvSet } = await import('@/lib/db');
+    kvSet('assetflow:priceHistory:fullBackfilled:NASDAQ:A', '1');
+
+    const urls: string[] = [];
+    const fetch = (async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.startsWith('/api/prices/history')) {
+        urls.push(url);
+        return new Response(
+          JSON.stringify({
+            symbol: 'NASDAQ:A',
+            status: 'ready',
+            rows: [
+              { date: '2026-05-14', close: 100 },
+              { date: '2026-05-15', close: 101 },
+            ],
+          }),
+          { status: 200 },
+        );
+      }
+      return new Response(JSON.stringify(pricesPayload()), { status: 200 });
+    }) as unknown as typeof fetch;
+
+    await syncPrices(fetch, ['NASDAQ:A']);
+
+    expect(urls[0]).toContain('from=2016-01-01');
+    expect(priceHistoryRepo.listSince('NASDAQ:A', '2000-01-01')).toEqual([
+      { date: '2026-05-14', close: 100 },
+      { date: '2026-05-15', close: 101 },
+    ]);
+
+    urls.length = 0;
+    await syncPrices(fetch, ['NASDAQ:A']);
+    expect(urls[0]).toContain('from=2026-05-15');
+  });
+
+  it('keeps the local cache when the purge refetch fails', async () => {
+    setLocalCatalog('1.0.0', [asset('KRX:A')]);
+    priceHistoryRepo.append('KRX:A', [{ date: '2026-05-14', close: 1090 }]);
+
+    const fetch = (async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.startsWith('/api/prices/history')) return new Response('oops', { status: 500 });
+      return new Response(JSON.stringify(pricesPayload()), { status: 200 });
+    }) as unknown as typeof fetch;
+
+    await syncPrices(fetch, ['KRX:A']);
+
+    expect(priceHistoryRepo.listSince('KRX:A', '2000-01-01')).toEqual([
+      { date: '2026-05-14', close: 1090 },
+    ]);
   });
 
   // Regression for the PLTR/AMZN/UBER case: client had a thin localMax window
@@ -289,7 +368,7 @@ describe('syncPrices — history sync (held symbols)', () => {
     }
   });
 
-  it('2+ business-day gap → backfills missing rows via /api/prices/history?from=localMax+1', async () => {
+  it('multi-day gap → refetches from localMax inclusive', async () => {
     setLocalCatalog('1.0.0', [asset('KRX:A')]);
     priceHistoryRepo.append('KRX:A', [{ date: '2026-05-13', close: 1080 }]);
     markFullBackfilled('KRX:A');
@@ -318,7 +397,7 @@ describe('syncPrices — history sync (held symbols)', () => {
     await syncPrices(fetch, ['KRX:A']);
 
     expect(historyUrl).toContain('symbol=KRX%3AA');
-    expect(historyUrl).toContain('from=2026-05-14');
+    expect(historyUrl).toContain('from=2026-05-13');
     expect(priceHistoryRepo.getMaxDate('KRX:A')).toBe('2026-05-15');
     expect(priceHistoryRepo.listSince('KRX:A', '2026-01-01')).toHaveLength(3);
   });

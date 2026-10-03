@@ -199,7 +199,12 @@ def fetch_us_tracked(prices: dict[str, dict]) -> None:
         ).fetchall()
     finally:
         con.close()
-    tickers = [r[0].split(":", 1)[1] for r in rows]
+    # Keep each symbol's own exchange prefix — NYSE:DELL used to be written
+    # back as NASDAQ:DELL, so the NYSE series silently stopped updating.
+    symbols_of: dict[str, list[str]] = {}
+    for (sym,) in rows:
+        symbols_of.setdefault(sym.split(":", 1)[1], []).append(sym)
+    tickers = list(symbols_of)
     if not tickers:
         return
     try:
@@ -227,7 +232,15 @@ def fetch_us_tracked(prices: dict[str, dict]) -> None:
             prev = float(valid.iloc[-2])
             change = close - prev
             pct = (change / prev) * 100.0 if prev > 0 else 0.0
-            prices[f"NASDAQ:{tk}"] = {"price": close, "change": change, "changePct": pct}
+            ts = valid.index[-1]
+            session = ts.strftime("%Y-%m-%d") if hasattr(ts, "strftime") else str(ts)[:10]
+            for sym in symbols_of[tk]:
+                prices[sym] = {
+                    "price": close,
+                    "change": change,
+                    "changePct": pct,
+                    "date": session,  # US session date of this close
+                }
             appended += 1
         except Exception as e:
             print(f"  US:{tk} skipped: {e}", file=sys.stderr)
@@ -264,144 +277,117 @@ def fetch_crypto(prices: dict[str, dict]) -> None:
         }
 
 
-def append_today_to_kr_business_days(today_kst: str) -> None:
-    """Record today as a KRX trading day in server.db, and ensure every date
-    already in price_history for any KRX symbol is also represented. The
-    union lets the price-sync flow detect business-day gaps for users whose
-    last local close predates the first time this script ran."""
+NAVER_KRX_BAR_URL = (
+    "https://api.finance.naver.com/siseJson.naver"
+    "?symbol=005930&requestType=0&count=1&timeframe=day"
+)
+
+
+def is_krx_trading_day(today: str, bar_dates: list[str]) -> bool:
+    return today in set(bar_dates)
+
+
+def latest_krx_bar_dates() -> list[str]:
+    """Date of the newest KRX daily bar (Samsung Electronics as the probe —
+    it trades every KRX session). On weekends/holidays this is the previous
+    trading day, so `today in …` tells whether KRX traded today."""
+    req = urllib.request.Request(
+        NAVER_KRX_BAR_URL,
+        headers={"User-Agent": "Mozilla/5.0", "Referer": "https://finance.naver.com/"},
+    )
+    body = urllib.request.urlopen(req, timeout=10).read().decode("euc-kr", errors="replace")
+    return [f"{y}-{m}-{d}" for y, m, d in re.findall(r'"(\d{4})(\d{2})(\d{2})"', body)]
+
+
+def krx_open_today(today_kst: str) -> bool:
+    try:
+        return is_krx_trading_day(today_kst, latest_krx_bar_dates())
+    except Exception as e:
+        weekday = date.fromisoformat(today_kst).weekday() < 5
+        print(f"  KRX trading-day probe failed ({e}); weekday fallback={weekday}", file=sys.stderr)
+        return weekday
+
+
+def daily_close_rows(
+    prices: dict[str, dict], ready: set[str], today_kst: str, krx_open: bool
+) -> list[tuple[str, str, float]]:
+    """Official closes the 15:35 KST job owns: KRX (only on KRX trading days)
+    and crypto (24/7, KST date). US closes belong to the post-US-close job,
+    dated by their US session."""
+    rows: list[tuple[str, str, float]] = []
+    for symbol in sorted(ready):
+        p = prices.get(symbol)
+        close = float((p or {}).get("price") or 0)
+        if close <= 0:
+            continue
+        if symbol.startswith("CRYPTO:") or (symbol.startswith("KRX:") and krx_open):
+            rows.append((symbol, today_kst, close))
+    return rows
+
+
+def us_close_rows(us_prices: dict[str, dict], ready: set[str]) -> list[tuple[str, str, float]]:
+    rows: list[tuple[str, str, float]] = []
+    for symbol, p in sorted(us_prices.items()):
+        close = float(p.get("price") or 0)
+        session = p.get("date")
+        if symbol in ready and close > 0 and session:
+            rows.append((symbol, str(session), close))
+    return rows
+
+
+def _connect_history() -> sqlite3.Connection:
+    SERVER_DB.parent.mkdir(parents=True, exist_ok=True)
+    con = sqlite3.connect(str(SERVER_DB))
+    con.execute("PRAGMA journal_mode=WAL")
+    con.execute(
+        """CREATE TABLE IF NOT EXISTS tracked_symbols (
+             symbol TEXT PRIMARY KEY,
+             first_added_at TEXT NOT NULL,
+             last_close_date TEXT,
+             source TEXT,
+             status TEXT NOT NULL DEFAULT 'pending'
+           )"""
+    )
+    con.execute(
+        "CREATE TABLE IF NOT EXISTS price_history ("
+        "symbol TEXT NOT NULL, date TEXT NOT NULL, close REAL NOT NULL, "
+        "PRIMARY KEY (symbol, date))"
+    )
+    con.execute("CREATE TABLE IF NOT EXISTS kr_business_days (date TEXT PRIMARY KEY)")
+    return con
+
+
+def ready_symbols() -> set[str]:
     if not SERVER_DB.exists():
-        SERVER_DB.parent.mkdir(parents=True, exist_ok=True)
-    con = sqlite3.connect(str(SERVER_DB))
+        return set()
+    con = _connect_history()
     try:
-        con.execute("PRAGMA journal_mode=WAL")
-        con.execute(
-            "CREATE TABLE IF NOT EXISTS kr_business_days (date TEXT PRIMARY KEY)"
-        )
-        con.execute(
-            "CREATE TABLE IF NOT EXISTS price_history ("
-            "symbol TEXT NOT NULL, date TEXT NOT NULL, close REAL NOT NULL, "
-            "PRIMARY KEY (symbol, date))"
-        )
-        con.execute(
-            "INSERT OR IGNORE INTO kr_business_days (date) VALUES (?)", (today_kst,)
-        )
-        con.execute(
-            "INSERT OR IGNORE INTO kr_business_days (date) "
-            "SELECT DISTINCT date FROM price_history WHERE symbol LIKE 'KRX:%'"
-        )
-        con.commit()
+        return {r[0] for r in con.execute("SELECT symbol FROM tracked_symbols WHERE status='ready'")}
     finally:
         con.close()
 
 
-def append_today_to_history_for_tracked() -> None:
-    """For every tracked_symbols.status='ready' symbol, append today's close
-    from the bulk price feed. INSERT OR IGNORE keeps re-runs idempotent."""
-    if not SERVER_DB.exists():
-        return  # No tracked symbols yet — skip.
-    con = sqlite3.connect(str(SERVER_DB))
+def write_closes(rows: list[tuple[str, str, float]], krx_business_day: str | None = None) -> None:
+    """Upsert official closes. Must OVERWRITE: an existing row for the same
+    date can only be a stale value, and INSERT OR IGNORE used to keep it."""
+    con = _connect_history()
     try:
-        con.execute("PRAGMA journal_mode=WAL")
-        con.execute(
-            """CREATE TABLE IF NOT EXISTS tracked_symbols (
-                 symbol TEXT PRIMARY KEY,
-                 first_added_at TEXT NOT NULL,
-                 last_close_date TEXT,
-                 source TEXT,
-                 status TEXT NOT NULL DEFAULT 'pending'
-               )"""
+        con.executemany(
+            "INSERT INTO price_history (symbol, date, close) VALUES (?, ?, ?) "
+            "ON CONFLICT(symbol, date) DO UPDATE SET close = excluded.close",
+            rows,
         )
-        con.execute(
-            """CREATE TABLE IF NOT EXISTS price_history (
-                 symbol TEXT NOT NULL,
-                 date TEXT NOT NULL,
-                 close REAL NOT NULL,
-                 PRIMARY KEY (symbol, date)
-               )"""
+        con.executemany(
+            "UPDATE tracked_symbols SET last_close_date = ? WHERE symbol = ? "
+            "AND (last_close_date IS NULL OR last_close_date < ?)",
+            [(d, s, d) for s, d, _ in rows],
         )
-        rows = con.execute(
-            "SELECT symbol FROM tracked_symbols WHERE status='ready'"
-        ).fetchall()
-        appended = 0
-        # `prices` (closure variable) holds the bulk fetch. Iterate symbols and
-        # write today's close where we have it.
-        for (symbol,) in rows:
-            p = prices.get(symbol)
-            if not p:
-                continue
-            close = float(p.get("price") or 0)
-            if close <= 0:
-                continue
-            today_kst = datetime.now(KST).date().isoformat()
-            con.execute(
-                "INSERT OR IGNORE INTO price_history (symbol, date, close) VALUES (?, ?, ?)",
-                (symbol, today_kst, close),
-            )
-            con.execute(
-                "UPDATE tracked_symbols SET last_close_date=? WHERE symbol=?",
-                (today_kst, symbol),
-            )
-            appended += 1
+        if krx_business_day:
+            con.execute("INSERT OR IGNORE INTO kr_business_days (date) VALUES (?)", (krx_business_day,))
         con.commit()
-        print(f"  appended today's close to {appended} tracked symbols", file=sys.stderr)
     finally:
         con.close()
-
-
-def append_us_history(us_prices: dict[str, dict]) -> None:
-    """Append today's (KST) close for the freshly-fetched US symbols only.
-    The post-US-close refresh must NOT touch KRX/crypto history — those are
-    owned by the 15:35 batch and tagging yesterday's KRX close under today's
-    date would corrupt the series."""
-    if not SERVER_DB.exists() or not us_prices:
-        return
-    con = sqlite3.connect(str(SERVER_DB))
-    try:
-        con.execute("PRAGMA journal_mode=WAL")
-        con.execute(
-            """CREATE TABLE IF NOT EXISTS tracked_symbols (
-                 symbol TEXT PRIMARY KEY,
-                 first_added_at TEXT NOT NULL,
-                 last_close_date TEXT,
-                 source TEXT,
-                 status TEXT NOT NULL DEFAULT 'pending'
-               )"""
-        )
-        con.execute(
-            """CREATE TABLE IF NOT EXISTS price_history (
-                 symbol TEXT NOT NULL,
-                 date TEXT NOT NULL,
-                 close REAL NOT NULL,
-                 PRIMARY KEY (symbol, date)
-               )"""
-        )
-        ready = {
-            r[0]
-            for r in con.execute(
-                "SELECT symbol FROM tracked_symbols WHERE status='ready'"
-            ).fetchall()
-        }
-        today_kst = datetime.now(KST).date().isoformat()
-        appended = 0
-        for symbol, p in us_prices.items():
-            if symbol not in ready:
-                continue
-            close = float(p.get("price") or 0)
-            if close <= 0:
-                continue
-            con.execute(
-                "INSERT OR IGNORE INTO price_history (symbol, date, close) VALUES (?, ?, ?)",
-                (symbol, today_kst, close),
-            )
-            con.execute(
-                "UPDATE tracked_symbols SET last_close_date=? WHERE symbol=?",
-                (today_kst, symbol),
-            )
-            appended += 1
-        con.commit()
-        print(f"  US refresh: appended close to {appended} symbols", file=sys.stderr)
-    finally:
-        con.close()
+    print(f"  wrote {len(rows)} official closes", file=sys.stderr)
 
 
 def load_env_local(path: Path) -> dict[str, str]:
@@ -480,8 +466,12 @@ def main() -> int:
     fx = fetch_fx_rates()
 
     today_kst = datetime.now(KST).date().isoformat()
-    append_today_to_kr_business_days(today_kst)
-    append_today_to_history_for_tracked()
+    krx_open = krx_open_today(today_kst)
+    print(f"  KRX trading day {today_kst}: {krx_open}", file=sys.stderr)
+    write_closes(
+        daily_close_rows(prices, ready_symbols(), today_kst, krx_open),
+        krx_business_day=today_kst if krx_open else None,
+    )
 
     OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
     payload = {
@@ -521,7 +511,7 @@ def run_us_only() -> int:
     payload["as_of"] = datetime.now(KST).isoformat(timespec="seconds")
     OUT_PATH.write_text(json.dumps(payload, ensure_ascii=False, indent=2))
     print(f"  updated {len(us_prices)} US prices → {OUT_PATH}", file=sys.stderr)
-    append_us_history(us_prices)
+    write_closes(us_close_rows(us_prices, ready_symbols()))
     # Silent push (no title/body) — refresh in the background, no dawn ping.
     notify_devices_via_fcm(title=None, body=None)
     return 0

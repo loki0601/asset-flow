@@ -37,7 +37,9 @@
 // (AuthProvider's boot effect treated any network failure during boot sync
 // as "no session" — see src/lib/bootAuth.ts). Must reach existing installs
 // immediately.
-const VERSION = 'v8';
+// Bumped 2026-10-03: price-history sync now mirrors the server (purges stale local
+// history once) — must reach existing installs immediately.
+const VERSION = 'v9';
 const CACHE = `assetflow-${VERSION}`;
 
 // Navigation network deadline. Long enough for a healthy tunnel round trip,
