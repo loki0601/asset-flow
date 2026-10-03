@@ -4,6 +4,8 @@ import {
   realizedPnl,
   filterTradesByPeriod,
   filterTradesByRange,
+  filterTradesByQuery,
+  type TradeSearchFields,
 } from '@/lib/transactionHistory';
 import type { Transaction, TransactionType } from '@/lib/schema';
 
@@ -168,5 +170,47 @@ describe('filterTradesByRange', () => {
   it('a single-day range matches only that day', () => {
     const ids = filterTradesByRange(all, '2026-05-15', '2026-05-15').map((t) => t.id);
     expect(ids).toEqual(['may15']);
+  });
+});
+
+describe('filterTradesByQuery', () => {
+  const samsung = txn('buy', '2026-07-01T00:00:00.000Z', { symbol: 'KRX:005930', accountId: 'a-lee' });
+  const nvda = txn('sell', '2026-07-02T00:00:00.000Z', { symbol: 'NASDAQ:NVDA', accountId: 'a-ko' });
+  const fields = (t: Transaction): TradeSearchFields => ({
+    names: t.symbol === 'KRX:005930' ? ['삼성전자', 'Samsung Electronics'] : ['엔비디아', 'NVIDIA Corp'],
+    account: t.accountId === 'a-lee' ? '이영록 · 삼성증권 국내주식' : '고금숙 · 한화투자증권 해외주식',
+  });
+  const all = [samsung, nvda];
+
+  it('empty / whitespace query passes everything through', () => {
+    expect(filterTradesByQuery(all, '  ', fields)).toEqual(all);
+  });
+
+  it('matches Korean or English names, case-insensitively', () => {
+    expect(filterTradesByQuery(all, '삼성', fields)).toEqual([samsung]);
+    expect(filterTradesByQuery(all, 'nvidia', fields)).toEqual([nvda]);
+  });
+
+  it('matches the ticker / code without the exchange prefix', () => {
+    expect(filterTradesByQuery(all, 'nvda', fields)).toEqual([nvda]);
+    expect(filterTradesByQuery(all, '005930', fields)).toEqual([samsung]);
+  });
+
+  it('matches the account owner, institution and account name', () => {
+    expect(filterTradesByQuery(all, '고금숙', fields)).toEqual([nvda]);
+    expect(filterTradesByQuery(all, '한화', fields)).toEqual([nvda]);
+  });
+
+  it('matches 매수 / 매도', () => {
+    expect(filterTradesByQuery(all, '매도', fields)).toEqual([nvda]);
+  });
+
+  it('supports Hangul initials', () => {
+    expect(filterTradesByQuery(all, 'ㅅㅅㅈㅈ', fields)).toEqual([samsung]);
+  });
+
+  it('requires every space-separated term to match (AND)', () => {
+    expect(filterTradesByQuery(all, '이영록 매수', fields)).toEqual([samsung]);
+    expect(filterTradesByQuery(all, '이영록 매도', fields)).toEqual([]);
   });
 });

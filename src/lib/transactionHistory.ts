@@ -4,6 +4,7 @@
  */
 
 import type { Transaction } from '@/lib/schema';
+import { isAllInitials, matchesInitials } from '@/lib/hangulInitials';
 
 export interface TradeDateGroup {
   /** YYYY-MM-DD (from occurredAt). */
@@ -85,6 +86,41 @@ export function filterTradesByRange(
   return txs.filter((t) => {
     const d = t.occurredAt.slice(0, 10);
     return d >= lo && d <= hi;
+  });
+}
+
+/** Display strings a trade can be found by — resolved by the page (catalog
+ *  names, account owner label) so this module stays pure. */
+export interface TradeSearchFields {
+  /** Asset display names, e.g. Korean and English. */
+  names: string[];
+  /** Account label, e.g. "이영록 · 삼성증권 국내주식". */
+  account: string;
+}
+
+/**
+ * Free-text filter for the 거래 page. Every space-separated term must match
+ * one of: asset name (ko/en), ticker code (without exchange prefix), account
+ * label, or 매수/매도. Hangul-initials terms ("ㅅㅅ") match asset names.
+ */
+export function filterTradesByQuery(
+  txs: Transaction[],
+  query: string,
+  fieldsOf: (tx: Transaction) => TradeSearchFields,
+): Transaction[] {
+  const terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  if (terms.length === 0) return txs;
+  return txs.filter((tx) => {
+    const { names, account } = fieldsOf(tx);
+    const code = (tx.symbol ?? '').split(':').pop() ?? '';
+    const haystack = [...names, code, account, tx.type === 'buy' ? '매수' : tx.type === 'sell' ? '매도' : '']
+      .join('\n')
+      .toLowerCase();
+    return terms.every(
+      (term) =>
+        haystack.includes(term) ||
+        (isAllInitials(term) && names.some((n) => matchesInitials(n, term))),
+    );
   });
 }
 

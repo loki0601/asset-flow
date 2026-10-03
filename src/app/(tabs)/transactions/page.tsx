@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeftRight } from 'lucide-react';
+import { ArrowLeftRight, Search, X } from 'lucide-react';
 import type { Account, FamilyMember, MarketAsset, Transaction } from '@/lib/schema';
 import { accountsRepo, familyRepo, transactionsRepo } from '@/lib/repos';
 import { useCurrentUserId, useMarketDataKey } from '@/components/AuthProvider';
@@ -9,6 +9,7 @@ import { useTheme } from '@/hooks/useTheme';
 import { getMarketAsset } from '@/lib/market';
 import {
   filterTradesByPeriod,
+  filterTradesByQuery,
   filterTradesByRange,
   groupTradesByDate,
   realizedPnl,
@@ -70,6 +71,7 @@ export default function TransactionsPage() {
   // Calendar collapses once a full range is picked; re-tapping 직접 선택 reopens it.
   const [calOpen, setCalOpen] = useState(false);
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
+  const [query, setQuery] = useState('');
 
   useEffect(() => {
     if (!userId) return;
@@ -87,8 +89,16 @@ export default function TransactionsPage() {
           ? filterTradesByRange(txs, range.start, range.end)
           : txs
         : filterTradesByPeriod(txs, period, new Date());
-    return groupTradesByDate(filtered);
-  }, [txs, period, range]);
+    const searched = filterTradesByQuery(filtered, query, (t) => {
+      const asset = assetFor(t.symbol ?? '');
+      const acc = accountById.get(t.accountId);
+      return {
+        names: [asset.nameKo ?? '', asset.name],
+        account: accountOwnerLabel(acc, acc ? memberById.get(acc.memberId) : undefined),
+      };
+    });
+    return groupTradesByDate(searched);
+  }, [txs, period, range, query, accountById, memberById]);
 
   const rangeComplete = range.start !== null && range.end !== null;
 
@@ -99,6 +109,34 @@ export default function TransactionsPage() {
 
   return (
     <div className="pb-10">
+      <div className="relative mb-3">
+        <Search
+          size={16}
+          className="absolute left-4 top-1/2 -translate-y-1/2 text-brand-sage pointer-events-none"
+        />
+        <input
+          type="search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="종목·계좌·이름·매수/매도 검색"
+          aria-label="거래 검색"
+          enterKeyHint="search"
+          autoCapitalize="none"
+          spellCheck={false}
+          className="w-full h-11 pl-10 pr-10 rounded-2xl bg-white border border-brand-line text-[13px] font-semibold text-brand-ink placeholder:text-brand-sage outline-none focus:border-brand focus:ring-1 focus:ring-brand/20 [&::-webkit-search-cancel-button]:hidden"
+        />
+        {query && (
+          <button
+            type="button"
+            onClick={() => setQuery('')}
+            aria-label="검색어 지우기"
+            className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-brand-sage active:opacity-60"
+          >
+            <X size={16} />
+          </button>
+        )}
+      </div>
+
       <div className="flex gap-1.5 mb-4 overflow-x-auto no-scrollbar px-0.5">
         {PERIODS.map((p) => {
           const label =
@@ -143,11 +181,19 @@ export default function TransactionsPage() {
       {groups.length === 0 ? (
         <EmptyState
           icon={ArrowLeftRight}
-          title={period === 'all' ? '매수·매도 이력이 없어요' : '해당 기간에 거래가 없어요'}
+          title={
+            query.trim()
+              ? `'${query.trim()}' 검색 결과가 없어요`
+              : period === 'all'
+                ? '매수·매도 이력이 없어요'
+                : '해당 기간에 거래가 없어요'
+          }
           description={
-            period === 'all'
-              ? '포트폴리오에서 매수하거나 매도하면 여기에 기록됩니다.'
-              : '다른 기간을 선택해 보세요.'
+            query.trim()
+              ? '다른 검색어나 기간으로 찾아보세요.'
+              : period === 'all'
+                ? '포트폴리오에서 매수하거나 매도하면 여기에 기록됩니다.'
+                : '다른 기간을 선택해 보세요.'
           }
         />
       ) : (
