@@ -184,7 +184,7 @@ def fetch_krx_gold(prices: dict[str, dict]) -> None:
     )
 
 
-def fetch_us_tracked(prices: dict[str, dict]) -> None:
+def fetch_us_tracked(prices: dict[str, dict], rows_out: dict[str, list] | None = None) -> None:
     """Latest close (USD) for every NASDAQ:/NYSE: symbol that's marked
     status='ready' in tracked_symbols. Uses yfinance.bulk download — fast
     enough for the family-sized portfolio. Skips silently when server.db
@@ -211,7 +211,7 @@ def fetch_us_tracked(prices: dict[str, dict]) -> None:
         import yfinance as yf
 
         df = yf.download(
-            " ".join(tickers), period="3d", progress=False, auto_adjust=False, group_by="ticker"
+            " ".join(tickers), period="7d", progress=False, auto_adjust=False, group_by="ticker"
         )
     except Exception as e:
         print(f"  US bulk fetch failed: {e}", file=sys.stderr)
@@ -226,6 +226,11 @@ def fetch_us_tracked(prices: dict[str, dict]) -> None:
             # ticker collapses to df['Close'].
             ser = df[tk]["Close"] if (tk, "Close") in df.columns else df["Close"]
             valid = ser.dropna()
+            if rows_out is not None:
+                for sym in symbols_of[tk]:
+                    rows_out[sym] = [
+                        (ts.strftime("%Y-%m-%d"), float(v)) for ts, v in valid.items() if float(v) > 0
+                    ]
             if len(valid) < 2:
                 continue
             close = float(valid.iloc[-1])
@@ -325,14 +330,81 @@ def daily_close_rows(
     return rows
 
 
-def us_close_rows(us_prices: dict[str, dict], ready: set[str]) -> list[tuple[str, str, float]]:
-    rows: list[tuple[str, str, float]] = []
-    for symbol, p in sorted(us_prices.items()):
-        close = float(p.get("price") or 0)
-        session = p.get("date")
-        if symbol in ready and close > 0 and session:
-            rows.append((symbol, str(session), close))
-    return rows
+NAVER_KRX_DAILY_URL = (
+    "https://api.stock.naver.com/chart/domestic/item/{code}/day"
+    "?startDateTime={start}0000&endDateTime={end}2359"
+)
+
+
+def parse_naver_daily(payload: object) -> list[tuple[str, float]]:
+    """Naver domestic daily bars → [(YYYY-MM-DD, close)] ascending."""
+    if not isinstance(payload, list):
+        return []
+    out: list[tuple[str, float]] = []
+    for r in payload:
+        d = str(r.get("localDate", "")) if isinstance(r, dict) else ""
+        try:
+            close = float(r.get("closePrice") or 0)
+        except (TypeError, ValueError, AttributeError):
+            continue
+        if len(d) == 8 and close > 0:
+            out.append((f"{d[:4]}-{d[4:6]}-{d[6:]}", close))
+    return sorted(out)
+
+
+def fetch_naver_krx_daily(code: str, days: int = 14) -> list[tuple[str, float]]:
+    end = date.today()
+    url = NAVER_KRX_DAILY_URL.format(
+        code=code,
+        start=(end - timedelta(days=days)).strftime("%Y%m%d"),
+        end=end.strftime("%Y%m%d"),
+    )
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+    return parse_naver_daily(json.loads(urllib.request.urlopen(req, timeout=10).read()))
+
+
+def apply_official_closes(prices: dict[str, dict], symbol: str, rows: list[tuple[str, float]]) -> None:
+    """Overwrite a snapshot quote with the official last close and the change
+    against the previous official close."""
+    if len(rows) < 2:
+        return
+    (_, prev), (_, last) = rows[-2], rows[-1]
+    change = last - prev
+    prices[symbol] = {
+        **prices.get(symbol, {}),
+        "price": last,
+        "change": change,
+        "changePct": (change / prev * 100.0) if prev > 0 else 0.0,
+    }
+
+
+def window_rows(history: dict[str, list[tuple[str, float]]], ready: set[str]) -> list[tuple[str, str, float]]:
+    """Every dated close in a recent window — rewriting the whole window each
+    run self-heals a day a previous run missed or got wrong."""
+    return [(s, d, c) for s in sorted(history) if s in ready for d, c in history[s]]
+
+
+def fetch_official_krx(prices: dict[str, dict], ready: set[str]) -> dict[str, list[tuple[str, float]]]:
+    """Official recent daily closes for tracked KRX symbols (stocks/ETFs via
+    Naver daily bars, gold via the market-index API); also patches `prices`
+    so the catalog/header use the official close, not the 15:35 snapshot."""
+    out: dict[str, list[tuple[str, float]]] = {}
+    for symbol in sorted(ready):
+        if not symbol.startswith("KRX:"):
+            continue
+        try:
+            if symbol == "KRX:GOLD":
+                rows = sorted((r["date"], r["close"]) for r in fetch_naver_gold_rows(size=10))
+            else:
+                rows = fetch_naver_krx_daily(symbol.split(":", 1)[1])
+        except Exception as e:
+            print(f"  official close {symbol} failed: {e}", file=sys.stderr)
+            continue
+        if rows:
+            out[symbol] = rows
+            apply_official_closes(prices, symbol, rows)
+    print(f"  official KRX closes: {len(out)} symbols", file=sys.stderr)
+    return out
 
 
 def _connect_history() -> sqlite3.Connection:
@@ -461,15 +533,20 @@ def main() -> int:
     fetch_krx_stocks(prices)
     fetch_krx_etfs(prices)
     fetch_krx_gold(prices)
-    fetch_us_tracked(prices)
+    us_history: dict[str, list] = {}
+    fetch_us_tracked(prices, us_history)
     fetch_crypto(prices)
     fx = fetch_fx_rates()
 
     today_kst = datetime.now(KST).date().isoformat()
     krx_open = krx_open_today(today_kst)
     print(f"  KRX trading day {today_kst}: {krx_open}", file=sys.stderr)
+    ready = ready_symbols()
+    official_krx = fetch_official_krx(prices, ready)
     write_closes(
-        daily_close_rows(prices, ready_symbols(), today_kst, krx_open),
+        daily_close_rows(prices, ready, today_kst, krx_open)
+        + window_rows(official_krx, ready)
+        + window_rows(us_history, ready),
         krx_business_day=today_kst if krx_open else None,
     )
 
@@ -501,7 +578,8 @@ def run_us_only() -> int:
     payload = json.loads(OUT_PATH.read_text())
     base_prices = payload.get("prices", {})
     us_prices: dict[str, dict] = {}
-    fetch_us_tracked(us_prices)
+    us_history: dict[str, list] = {}
+    fetch_us_tracked(us_prices, us_history)
     if not us_prices:
         print("  no US prices fetched; leaving prices.json unchanged", file=sys.stderr)
         return 0
@@ -511,7 +589,7 @@ def run_us_only() -> int:
     payload["as_of"] = datetime.now(KST).isoformat(timespec="seconds")
     OUT_PATH.write_text(json.dumps(payload, ensure_ascii=False, indent=2))
     print(f"  updated {len(us_prices)} US prices → {OUT_PATH}", file=sys.stderr)
-    write_closes(us_close_rows(us_prices, ready_symbols()))
+    write_closes(window_rows(us_history, ready_symbols()))
     # Silent push (no title/body) — refresh in the background, no dawn ping.
     notify_devices_via_fcm(title=None, body=None)
     return 0
