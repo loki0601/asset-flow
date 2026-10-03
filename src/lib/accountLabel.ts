@@ -14,3 +14,13 @@ export function accountOwnerLabel(
   const owner = member ? `${member.name} · ` : '';
   return `${owner}${account.institution} ${account.name}`;
 }
+
+/** Settings profile card: first family member's name, with the server
+ *  account id underneath (the name falls back to the id while members load). */
+export function profileLabel(
+  memberName: string | undefined,
+  username: string,
+): { name: string; subtitle: string } {
+  const name = memberName?.trim() ? memberName.trim() : username;
+  return { name, subtitle: username };
+}

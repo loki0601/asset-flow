@@ -13,8 +13,9 @@ import { CatalogSyncRow } from '@/features/settings/CatalogSyncRow';
 import { PriceSyncRow } from '@/features/settings/PriceSyncRow';
 import { ServerBackupRow } from '@/features/settings/ServerBackupRow';
 import { FxRateCard } from '@/features/settings/FxRateCard';
-import { useCurrentUserId, useSignOut } from '@/components/AuthProvider';
-import { listUsers } from '@/lib/auth';
+import { useCurrentUserId } from '@/components/AuthProvider';
+import { getServerSession } from '@/lib/auth';
+import { profileLabel } from '@/lib/accountLabel';
 import { familyRepo } from '@/lib/repos';
 import { Modal } from '@/components/Modal';
 import { ModalHeader } from '@/components/ModalHeader';
@@ -24,7 +25,7 @@ const APP_VERSION = '0.1.0';
 
 export default function SettingsPage() {
   const userId = useCurrentUserId();
-  const [displayName, setDisplayName] = useState('');
+  const [memberName, setMemberName] = useState<string | undefined>(undefined);
   const [memberCount, setMemberCount] = useState(0);
   const [notifications, setNotifications] = useState(true);
   const { theme, setTheme } = useTheme();
@@ -33,18 +34,13 @@ export default function SettingsPage() {
 
   useEffect(() => {
     if (!userId) return;
-    // Prefer the first family member's real name (e.g. "이영록").  Falls
-    // back to the login username if no members are registered yet — which
-    // shouldn't happen after onboarding but covers edge cases.
     const members = familyRepo.list(userId);
-    const memberName = members[0]?.name;
-    setDisplayName(
-      memberName ?? listUsers().find((u) => u.id === userId)?.username ?? '',
-    );
+    setMemberName(members[0]?.name);
     setMemberCount(members.length);
   }, [userId]);
 
   const requiresMember = memberCount === 0;
+  const profile = profileLabel(memberName, getServerSession()?.user.username ?? '');
 
   function handleGuardedClick(e: React.MouseEvent) {
     if (requiresMember) {
@@ -67,8 +63,8 @@ export default function SettingsPage() {
           <CircleUser size={28} />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-base font-black text-brand-ink truncate">{displayName || '사용자'} 님</p>
-          <p className="text-[11px] text-brand-sage truncate">로그인 됨</p>
+          <p className="text-base font-black text-brand-ink truncate">{profile.name} 님</p>
+          <p className="text-[11px] text-brand-sage truncate">{profile.subtitle}</p>
         </div>
         <ChevronRight size={18} className="text-gray-300 shrink-0" />
       </button>
@@ -148,38 +144,12 @@ export default function SettingsPage() {
         </div>
       </section>
 
-      <div className="px-6 flex justify-between items-center text-brand-sage text-[10px] font-bold uppercase tracking-widest mt-2">
+      <div className="px-6 flex justify-center items-center text-brand-sage text-[10px] font-bold uppercase tracking-widest mt-2">
         <span>App Version {APP_VERSION}</span>
-        <LogoutButton />
       </div>
 
       <NeedMemberModal open={needMembersOpen} onClose={() => setNeedMembersOpen(false)} />
     </div>
-  );
-}
-
-function LogoutButton() {
-  const signOut = useSignOut();
-  const [confirmOpen, setConfirmOpen] = useState(false);
-  return (
-    <>
-      <button
-        type="button"
-        onClick={() => setConfirmOpen(true)}
-        className="text-rose-500"
-      >
-        Logout
-      </button>
-      <ConfirmModal
-        open={confirmOpen}
-        onClose={() => setConfirmOpen(false)}
-        onConfirm={signOut}
-        title="로그아웃 하시겠어요?"
-        body="다음 진입 시 다시 로그인이 필요해요."
-        confirmLabel="로그아웃"
-        destructive
-      />
-    </>
   );
 }
 

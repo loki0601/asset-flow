@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { getServerSession, logout as clearSession } from '@/lib/auth';
+import { getServerSession } from '@/lib/auth';
 import { familyRepo } from '@/lib/repos';
 import { syncThemeFromDb } from '@/hooks/useTheme';
 
@@ -63,8 +63,6 @@ interface AuthValue {
   pricesSyncing: boolean;
   /** Adopt a freshly authenticated user — called by /login + /signup. */
   signIn: (userId: string) => void;
-  /** Clear the persisted session and reset in-memory userId. */
-  signOut: () => void;
 }
 
 const Ctx = createContext<AuthValue>({
@@ -78,7 +76,6 @@ const Ctx = createContext<AuthValue>({
   refreshPrices: async () => {},
   pricesSyncing: false,
   signIn: () => {},
-  signOut: () => {},
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -92,7 +89,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       | 'refreshPrices'
       | 'pricesSyncing'
       | 'signIn'
-      | 'signOut'
     >
   >({
     userId: null,
@@ -472,11 +468,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setState((prev) => ({ ...prev, userId }));
   }, []);
 
-  const signOut = useCallback(() => {
-    clearSession();
-    setState((prev) => ({ ...prev, userId: null }));
-    router.replace('/login');
-  }, [router]);
 
   /**
    * Auth gate: once boot finishes, route the user to the right page based
@@ -517,7 +508,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         refreshPrices,
         pricesSyncing,
         signIn,
-        signOut,
       }}
     >
       {children}
@@ -529,9 +519,6 @@ export function useSignIn(): (userId: string) => void {
   return useContext(Ctx).signIn;
 }
 
-export function useSignOut(): () => void {
-  return useContext(Ctx).signOut;
-}
 
 export function useCurrentUserId(): string | null {
   return useContext(Ctx).userId;

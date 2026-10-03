@@ -39,7 +39,7 @@
 // immediately.
 // Bumped 2026-10-03: price-history sync now mirrors the server (purges stale local
 // history once) — must reach existing installs immediately.
-const VERSION = 'v10';
+const VERSION = 'v11';
 const CACHE = `assetflow-${VERSION}`;
 
 // Navigation network deadline. Long enough for a healthy tunnel round trip,
