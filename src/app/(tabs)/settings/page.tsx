@@ -26,6 +26,7 @@ const APP_VERSION = '0.1.0';
 export default function SettingsPage() {
   const userId = useCurrentUserId();
   const [memberName, setMemberName] = useState<string | undefined>(undefined);
+  const [username, setUsername] = useState('');
   const [memberCount, setMemberCount] = useState(0);
   const [notifications, setNotifications] = useState(true);
   const { theme, setTheme } = useTheme();
@@ -36,11 +37,12 @@ export default function SettingsPage() {
     if (!userId) return;
     const members = familyRepo.list(userId);
     setMemberName(members[0]?.name);
+    setUsername(getServerSession()?.user.username ?? '');
     setMemberCount(members.length);
   }, [userId]);
 
   const requiresMember = memberCount === 0;
-  const profile = profileLabel(memberName, getServerSession()?.user.username ?? '');
+  const profile = profileLabel(memberName, username);
 
   function handleGuardedClick(e: React.MouseEvent) {
     if (requiresMember) {
