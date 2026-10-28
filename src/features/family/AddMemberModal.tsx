@@ -9,18 +9,21 @@ interface Props {
   open: boolean;
   onClose: () => void;
   onSubmit: (name: string) => void;
+  /** Edit mode: prefill with the current name. */
+  initialName?: string;
 }
 
-export function AddMemberModal({ open, onClose, onSubmit }: Props) {
+export function AddMemberModal({ open, onClose, onSubmit, initialName }: Props) {
+  const isEdit = initialName !== undefined;
   const [name, setName] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (open) {
-      setName('');
+      setName(initialName ?? '');
       setError(null);
     }
-  }, [open]);
+  }, [open, initialName]);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -38,7 +41,7 @@ export function AddMemberModal({ open, onClose, onSubmit }: Props) {
             <Users size={20} />
           </div>
         }
-        title="구성원 추가"
+        title={isEdit ? '이름 변경' : '구성원 추가'}
         onClose={onClose}
       />
       <form onSubmit={handleSubmit} className="px-6 pb-6 space-y-4">
@@ -56,7 +59,7 @@ export function AddMemberModal({ open, onClose, onSubmit }: Props) {
           type="submit"
           className="w-full py-4 rounded-2xl text-sm font-black text-white bg-brand shadow-lg shadow-brand/20"
         >
-          추가
+          {isEdit ? '저장' : '추가'}
         </button>
       </form>
     </Modal>

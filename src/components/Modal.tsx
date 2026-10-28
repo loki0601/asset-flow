@@ -57,7 +57,10 @@ export function Modal({
   return (
     <dialog
       ref={ref}
-      onClose={onClose}
+      onClose={(e) => {
+        // A nested dialog's close event propagates through the React tree.
+        if (e.target === ref.current) onClose();
+      }}
       onClick={handleBackdropClick}
       style={{
         position: 'fixed',

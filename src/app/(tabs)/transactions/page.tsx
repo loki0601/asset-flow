@@ -23,6 +23,7 @@ import { AssetCategoryIcon } from '@/components/AssetCategoryIcon';
 import { RangeCalendar } from '@/components/RangeCalendar';
 import { EmptyState } from '@/components/EmptyState';
 import { TradeDetailModal } from '@/features/transactions/TradeDetailModal';
+import { deleteTransaction } from '@/lib/ledgerOps';
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
 
@@ -72,6 +73,7 @@ export default function TransactionsPage() {
   const [calOpen, setCalOpen] = useState(false);
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
   const [query, setQuery] = useState('');
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!userId) return;
@@ -101,6 +103,22 @@ export default function TransactionsPage() {
   }, [txs, period, range, query, accountById, memberById]);
 
   const rangeComplete = range.start !== null && range.end !== null;
+
+  function handleDelete(tx: Transaction) {
+    if (!userId) return;
+    const result = deleteTransaction(userId, tx.id);
+    if (!result.ok) {
+      setDeleteError(
+        result.reason === 'insufficient-quantity'
+          ? '이 매수로 산 주식이 이미 매도되어 삭제할 수 없어요. 이후 매도 거래를 먼저 삭제해 주세요.'
+          : '이미 삭제된 거래입니다.',
+      );
+      return;
+    }
+    setTxs(transactionsRepo.list(userId));
+    setSelectedTx(null);
+    setDeleteError(null);
+  }
 
   function accountLabel(accountId: string): string {
     const acc = accountById.get(accountId);
@@ -221,7 +239,12 @@ export default function TransactionsPage() {
 
       <TradeDetailModal
         open={selectedTx !== null}
-        onClose={() => setSelectedTx(null)}
+        onClose={() => {
+          setSelectedTx(null);
+          setDeleteError(null);
+        }}
+        onDelete={handleDelete}
+        deleteError={deleteError}
         tx={selectedTx}
         asset={assetFor(selectedTx?.symbol ?? '')}
         accountLabel={selectedTx ? accountLabel(selectedTx.accountId) : ''}

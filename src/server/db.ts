@@ -180,8 +180,8 @@ function toServerUser(row: { id: string; username: string; created_at: string })
 
 export function createServerUser(username: string, password: string): ServerUser {
   const cleanUsername = username.trim();
-  if (cleanUsername.length < 2) throw new Error('username must be at least 2 characters');
-  if (password.length < 8) throw new Error('password must be at least 8 characters');
+  if (cleanUsername.length < 2) throw new Error('아이디는 2자 이상이어야 합니다.');
+  if (password.length < 8) throw new Error('비밀번호는 8자 이상이어야 합니다.');
   const user: ServerUser = {
     id: randomUUID(),
     username: cleanUsername,

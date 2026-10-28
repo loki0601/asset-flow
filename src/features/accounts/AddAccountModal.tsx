@@ -1,11 +1,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { CreditCard, ChevronDown } from 'lucide-react';
-import type { FamilyMember } from '@/lib/schema';
+import { CreditCard, ChevronDown, Trash2 } from 'lucide-react';
+import type { Account, FamilyMember } from '@/lib/schema';
 import { INSTITUTIONS, type InstitutionKind } from '@/lib/institutions';
 import { Modal } from '@/components/Modal';
 import { ModalHeader } from '@/components/ModalHeader';
+import { ConfirmModal } from '@/components/ConfirmModal';
 
 export interface AddAccountInput {
   memberId: string;
@@ -18,6 +19,10 @@ interface Props {
   onClose: () => void;
   members: FamilyMember[];
   onSubmit: (input: AddAccountInput) => void;
+  /** Edit mode: prefill from this account and offer deletion. */
+  initial?: Account | null;
+  onDelete?: () => void;
+  deleteError?: string | null;
 }
 
 const KIND_LABELS: Record<InstitutionKind, string> = {
@@ -28,20 +33,23 @@ const KIND_LABELS: Record<InstitutionKind, string> = {
 
 const KIND_ORDER: InstitutionKind[] = ['증권사', '연금기관', '코인거래소'];
 
-export function AddAccountModal({ open, onClose, members, onSubmit }: Props) {
+export function AddAccountModal({ open, onClose, members, onSubmit, initial, onDelete, deleteError }: Props) {
   const [memberId, setMemberId] = useState('');
   const [institution, setInstitution] = useState(INSTITUTIONS[0]?.name ?? '');
   const [name, setName] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const isEdit = Boolean(initial);
 
   useEffect(() => {
     if (open) {
-      setMemberId(members[0]?.id ?? '');
-      setInstitution(INSTITUTIONS[0]?.name ?? '');
-      setName('');
+      const ownerExists = initial && members.some((m) => m.id === initial.memberId);
+      setMemberId(ownerExists ? initial.memberId : (members[0]?.id ?? ''));
+      setInstitution(initial?.institution ?? INSTITUTIONS[0]?.name ?? '');
+      setName(initial?.name ?? '');
       setError(null);
     }
-  }, [open, members]);
+  }, [open, members, initial]);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -63,7 +71,7 @@ export function AddAccountModal({ open, onClose, members, onSubmit }: Props) {
             <CreditCard size={20} />
           </div>
         }
-        title="계좌 추가"
+        title={isEdit ? '계좌 수정' : '계좌 추가'}
         onClose={onClose}
       />
 
@@ -89,15 +97,38 @@ export function AddAccountModal({ open, onClose, members, onSubmit }: Props) {
           />
         </Field>
 
-        {error && <p className="text-xs font-bold text-rose-500">{error}</p>}
+        {(error ?? deleteError) && <p className="text-xs font-bold text-rose-500">{error ?? deleteError}</p>}
 
         <button
           type="submit"
           className="w-full py-4 rounded-2xl text-sm font-black text-white bg-brand shadow-lg shadow-brand/20"
         >
-          계좌 추가
+          {isEdit ? '저장' : '계좌 추가'}
         </button>
+
+        {isEdit && onDelete && (
+          <button
+            type="button"
+            onClick={() => setConfirmOpen(true)}
+            className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl bg-rose-50 text-rose-500 text-sm font-bold"
+          >
+            <Trash2 size={16} />
+            계좌 삭제
+          </button>
+        )}
       </form>
+
+      {onDelete && (
+        <ConfirmModal
+          open={confirmOpen}
+          onClose={() => setConfirmOpen(false)}
+          onConfirm={onDelete}
+          title="이 계좌를 삭제할까요?"
+          body={'계좌의 거래 내역도 함께 삭제됩니다.\n보유 종목이 남아 있으면 먼저 매도하거나 거래를 삭제해 주세요.'}
+          confirmLabel="삭제"
+          destructive
+        />
+      )}
     </Modal>
   );
 }

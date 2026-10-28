@@ -28,10 +28,12 @@ import type {
   MarketAsset,
 } from '@/lib/schema';
 import { aliasFor } from '@/server/data/usAliases';
+import { markDelistedKrx } from '@/server/domain/delisting';
 
 // 3.6.0 — adds nameKo (Korean alias) on US-listed assets. Clients on older
 // versions fall back to the English name and re-sync on next version probe.
-export const SERVER_VERSION = '3.6.0';
+// 3.7.0 — marks KRX assets missing from the daily price snapshot as deprecated.
+export const SERVER_VERSION = '3.7.0';
 
 interface RawAsset {
   symbol: string;
@@ -182,7 +184,7 @@ function buildAssets(): MarketAsset[] {
       updatedAt: p ? updatedAt : extra.updatedAt,
     });
   }
-  return out;
+  return markDelistedKrx(out, new Set(Object.keys(priceFile.prices)));
 }
 
 export const ASSETS: MarketAsset[] = buildAssets();

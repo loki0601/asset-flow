@@ -47,7 +47,11 @@ export async function POST(request: Request) {
         ? body.changes.map(invalidChangeReason).filter((r): r is string => r !== null).slice(0, 5)
         : undefined,
     });
-    return NextResponse.json({ error: '1~100개의 변경분이 필요합니다.' }, { status: 400 });
+    const sizeOk = Array.isArray(body?.changes) && body.changes.length >= 1 && body.changes.length <= 100;
+    return NextResponse.json(
+      { error: sizeOk ? '올바르지 않은 변경분이 포함되어 있습니다.' : '1~100개의 변경분이 필요합니다.' },
+      { status: 400 },
+    );
   }
   const results = body.changes.map((change) => appendSyncChange(user.id, change));
   return NextResponse.json({ results }, { headers: { 'Cache-Control': 'no-store' } });

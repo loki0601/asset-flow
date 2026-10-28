@@ -20,6 +20,7 @@ export function RetirementSummaryCard({ profile }: { profile: RetirementProfile 
           </h2>
           <p className="text-[11px] text-white/60 font-medium mt-1">
             목표 {formatKRW(profile.targetMonthly)} / 월
+            {profile.targetBasisAge ? ` (만 ${profile.targetBasisAge}세 물가 기준)` : ''}
           </p>
         </div>
         <div className="bg-white/10 p-2 rounded-xl shrink-0">

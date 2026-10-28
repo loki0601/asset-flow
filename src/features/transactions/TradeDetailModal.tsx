@@ -1,9 +1,11 @@
 'use client';
 
-import { ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import { useState } from 'react';
+import { ArrowUpRight, ArrowDownRight, Trash2 } from 'lucide-react';
 import type { MarketAsset, Transaction } from '@/lib/schema';
 import { Modal } from '@/components/Modal';
 import { ModalHeader } from '@/components/ModalHeader';
+import { ConfirmModal } from '@/components/ConfirmModal';
 import { AssetCategoryIcon } from '@/components/AssetCategoryIcon';
 import { assetDisplayName } from '@/lib/assetDisplay';
 import { categoryColor } from '@/lib/categoryColors';
@@ -22,12 +24,16 @@ interface Props {
   /** "6월 10일 (수)" — pre-formatted by the caller (page already has the
    *  date-header formatter for the surrounding group). */
   dateLabel: string;
+  onDelete: (tx: Transaction) => void;
+  /** Shown under the stats when the last delete attempt was refused. */
+  deleteError: string | null;
 }
 
-/** Detail popup for a single buy/sell row on the 거래 내역 page. Read-only —
+/** Detail popup for a single buy/sell row on the 거래 내역 page —
  *  mirrors HoldingDetailModal/LoanDetailModal's stat-grid layout. */
-export function TradeDetailModal({ open, onClose, tx, asset, accountLabel, dateLabel }: Props) {
+export function TradeDetailModal({ open, onClose, tx, asset, accountLabel, dateLabel, onDelete, deleteError }: Props) {
   const { theme } = useTheme();
+  const [confirmOpen, setConfirmOpen] = useState(false);
   if (!tx) return null;
 
   const isBuy = tx.type === 'buy';
@@ -104,6 +110,28 @@ export function TradeDetailModal({ open, onClose, tx, asset, accountLabel, dateL
           <p className="text-sm font-medium text-brand-ink whitespace-pre-wrap">{tx.memo}</p>
         </div>
       )}
+
+      <div className="px-6 py-4 border-t border-gray-100">
+        {deleteError && <p className="text-xs font-bold text-rose-500 mb-3">{deleteError}</p>}
+        <button
+          type="button"
+          onClick={() => setConfirmOpen(true)}
+          className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl bg-rose-50 text-rose-500 text-sm font-bold"
+        >
+          <Trash2 size={16} />
+          거래 삭제
+        </button>
+      </div>
+
+      <ConfirmModal
+        open={confirmOpen}
+        onClose={() => setConfirmOpen(false)}
+        onConfirm={() => onDelete(tx)}
+        title="이 거래를 삭제할까요?"
+        body={'보유 수량과 평균 단가가 이 거래 이전 상태로 되돌아갑니다.\n잘못 입력한 거래는 삭제 후 다시 입력해 주세요.'}
+        confirmLabel="삭제"
+        destructive
+      />
     </Modal>
   );
 }

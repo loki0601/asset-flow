@@ -29,6 +29,38 @@ export function applySell(
   };
 }
 
+export function validateSellQuantity(
+  holding: Pick<Holding, 'quantity'> | null,
+  quantity: number,
+): 'no-holding' | 'exceeds-holding' | null {
+  if (!holding) return 'no-holding';
+  if (quantity > holding.quantity) return 'exceeds-holding';
+  return null;
+}
+
+export type ReverseTradeResult =
+  | { ok: true; quantity: number; avgPrice: number }
+  | { ok: false; reason: 'insufficient-quantity' };
+
+/** Position after undoing a recorded trade. quantity 0 means no position remains. */
+export function reverseTrade(
+  holding: Pick<Holding, 'quantity' | 'avgPrice'> | null,
+  tx: { type: 'buy' | 'sell'; quantity: number; price: number; avgCostAtSale?: number },
+): ReverseTradeResult {
+  const heldQty = holding?.quantity ?? 0;
+  const heldAvg = holding?.avgPrice ?? 0;
+  if (tx.type === 'buy') {
+    if (heldQty < tx.quantity) return { ok: false, reason: 'insufficient-quantity' };
+    const quantity = heldQty - tx.quantity;
+    if (quantity === 0) return { ok: true, quantity: 0, avgPrice: 0 };
+    const avgPrice = (heldQty * heldAvg - tx.quantity * tx.price) / quantity;
+    return { ok: true, quantity, avgPrice: avgPrice > 0 ? avgPrice : heldAvg };
+  }
+  const restoredCost = tx.avgCostAtSale ?? tx.price;
+  const quantity = heldQty + tx.quantity;
+  return { ok: true, quantity, avgPrice: (heldQty * heldAvg + tx.quantity * restoredCost) / quantity };
+}
+
 /**
  * Pick the account that should be selected by default when the buy/sell
  * dialog opens. Prefers an account already holding this symbol — that's

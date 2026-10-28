@@ -36,7 +36,7 @@ function summaryFor(args: {
   accounts: Account[];
   holdings: Holding[];
   fxUsdKrw: number;
-}): { expectedMonthly: number; targetMonthly: number } {
+}): { expectedMonthly: number; targetMonthly: number; basisAge: number | null } {
   const principalCorporate = pensionPrincipalForMember({
     memberId: args.target.memberId,
     category: 'corporate',
@@ -68,6 +68,7 @@ function summaryFor(args: {
   return {
     expectedMonthly: Math.round(expectedMonthly),
     targetMonthly: Math.round(proj.inflatedMonthlyTargetAtStart),
+    basisAge: args.target.inflationAdjustEnabled === false ? null : proj.earliestStartAge,
   };
 }
 
@@ -109,6 +110,7 @@ export default function RetirementPage() {
       selected === 'all' ? planningMembers : planningMembers.filter((m) => m.id === selected);
     let expectedMonthly = 0;
     let targetMonthly = 0;
+    let basisAge: number | null = null;
     let name = '';
     if (visible.length === 1) name = visible[0].name;
     else if (visible.length > 1) name = '전체';
@@ -118,11 +120,13 @@ export default function RetirementPage() {
       const s = summaryFor({ target, accounts, holdings, fxUsdKrw });
       expectedMonthly += s.expectedMonthly;
       targetMonthly += s.targetMonthly;
+      basisAge = visible.length === 1 ? s.basisAge : null;
     }
     return {
       name,
       expectedMonthly,
       targetMonthly,
+      targetBasisAge: basisAge ?? undefined,
       targetAge: 0,
       currentAge: 0,
     };

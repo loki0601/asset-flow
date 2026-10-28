@@ -8,7 +8,7 @@ import { accountsRepo, familyRepo, holdingsRepo, transactionsRepo } from '@/lib/
 import { institutionSupports } from '@/lib/institutions';
 import { formatPrice, type PriceCurrency } from '@/lib/loans';
 import { valuationAmount, validateTradeInput } from '@/lib/holdings';
-import { applyBuy, applySell, formatPriceInput, preferredAccountId } from '@/lib/trade';
+import { applyBuy, applySell, formatPriceInput, preferredAccountId, validateSellQuantity } from '@/lib/trade';
 import { trackSymbolHistory } from '@/lib/prices';
 import { useCurrentUserId } from '@/components/AuthProvider';
 import { ModalHeader } from '@/components/ModalHeader';
@@ -148,7 +148,11 @@ export function TradeForm({ asset, side, onBack, onClose, memberId = 'all' }: Pr
         trackSymbolHistory(asset.symbol);
       }
     } else {
-      if (!existing) return setError('해당 계좌에 보유 종목이 없습니다.');
+      const sellError = validateSellQuantity(existing ?? null, qty);
+      if (sellError === 'no-holding' || !existing) return setError('해당 계좌에 보유 종목이 없습니다.');
+      if (sellError === 'exceeds-holding') {
+        return setError(`보유 수량(${existing.quantity}주)보다 많이 매도할 수 없습니다.`);
+      }
       const next = applySell(existing, { quantity: qty });
       if (next === null) holdingsRepo.remove(userId, existing.id);
       else holdingsRepo.update(userId, existing.id, next);
@@ -236,7 +240,7 @@ export function TradeForm({ asset, side, onBack, onClose, memberId = 'all' }: Pr
               <div className="relative">
                 <select
                   value={accountId ?? ''}
-                  onChange={(e) => setAccountId(e.target.value)}
+                  onChange={(e) => { setAccountId(e.target.value); setError(null); }}
                   className="w-full appearance-none bg-brand-surface px-4 py-3 pr-9 rounded-2xl text-sm font-bold text-brand-ink focus:outline-none truncate"
                 >
                   {accountsForOwner.map((acc) => (
@@ -263,7 +267,7 @@ export function TradeForm({ asset, side, onBack, onClose, memberId = 'all' }: Pr
             )}
             <input
               value={priceStr}
-              onChange={(e) => setPriceStr(formatPriceInput(e.target.value))}
+              onChange={(e) => { setPriceStr(formatPriceInput(e.target.value)); setError(null); }}
               inputMode="decimal"
               placeholder={
                 asset.currency === 'USD'
@@ -280,7 +284,7 @@ export function TradeForm({ asset, side, onBack, onClose, memberId = 'all' }: Pr
         <Field label="수량">
           <input
             value={qtyStr}
-            onChange={(e) => setQtyStr(e.target.value)}
+            onChange={(e) => { setQtyStr(e.target.value); setError(null); }}
             inputMode="decimal"
             placeholder="0"
             className="w-full bg-brand-surface px-4 py-3 rounded-2xl text-sm font-bold text-brand-ink focus:outline-none tabular-nums"

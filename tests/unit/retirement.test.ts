@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computeAttainment, yearsUntilRetirement } from '@/lib/retirement';
+import { computeAttainment, validateRetirementAges, yearsUntilRetirement } from '@/lib/retirement';
 
 describe('computeAttainment', () => {
   it('returns expected/target as percent, rounded to integer', () => {
@@ -31,5 +31,27 @@ describe('yearsUntilRetirement', () => {
 
   it('returns 0 when ages are equal', () => {
     expect(yearsUntilRetirement(60, 60)).toBe(0);
+  });
+});
+
+describe('validateRetirementAges', () => {
+  const ok = { currentAge: 40, targetAge: 60, pensions: [{ label: '국민연금', enabled: true, startAge: 65 }] };
+
+  it('accepts realistic ages', () => {
+    expect(validateRetirementAges(ok)).toBeNull();
+  });
+
+  it('rejects an out-of-range current or target age', () => {
+    expect(validateRetirementAges({ ...ok, currentAge: 3840 })).toBe('현재 나이는 1~120세 사이로 입력하세요.');
+    expect(validateRetirementAges({ ...ok, targetAge: 0 })).toBe('은퇴 목표 나이는 1~120세 사이로 입력하세요.');
+  });
+
+  it('rejects an out-of-range pension start age only when that pension is enabled', () => {
+    expect(
+      validateRetirementAges({ ...ok, pensions: [{ label: '국민연금', enabled: true, startAge: 6565 }] }),
+    ).toBe('국민연금 수령 시작 나이는 1~120세 사이로 입력하세요.');
+    expect(
+      validateRetirementAges({ ...ok, pensions: [{ label: '국민연금', enabled: false, startAge: 6565 }] }),
+    ).toBeNull();
   });
 });

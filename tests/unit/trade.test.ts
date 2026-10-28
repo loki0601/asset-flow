@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { applyBuy, applySell, formatPriceInput, preferredAccountId } from '@/lib/trade';
+import { applyBuy, applySell, formatPriceInput, preferredAccountId, reverseTrade, validateSellQuantity } from '@/lib/trade';
 import type { Account, Holding } from '@/lib/schema';
 
 const baseHolding: Holding = {
@@ -128,5 +128,70 @@ describe('formatPriceInput', () => {
 
   it('leading-dot input is treated as 0.x', () => {
     expect(formatPriceInput('.5')).toBe('0.5');
+  });
+});
+
+describe('validateSellQuantity', () => {
+  it('rejects selling a symbol the account does not hold', () => {
+    expect(validateSellQuantity(null, 1)).toBe('no-holding');
+  });
+
+  it('rejects selling more than the held quantity', () => {
+    expect(validateSellQuantity(baseHolding, 20)).toBe('exceeds-holding');
+  });
+
+  it('allows selling up to the full position', () => {
+    expect(validateSellQuantity(baseHolding, 10)).toBeNull();
+    expect(validateSellQuantity(baseHolding, 3)).toBeNull();
+  });
+});
+
+describe('reverseTrade', () => {
+  it('undoes a buy by removing its shares and its weight from avgPrice', () => {
+    const afterBuy = applyBuy(baseHolding, { quantity: 5, price: 80_000 });
+    const result = reverseTrade(afterBuy, { type: 'buy', quantity: 5, price: 80_000 });
+    expect(result).toEqual({ ok: true, quantity: 10, avgPrice: expect.closeTo(70_000, 4) });
+  });
+
+  it('undoing the only buy leaves no position', () => {
+    const result = reverseTrade(baseHolding, { type: 'buy', quantity: 10, price: 70_000 });
+    expect(result).toEqual({ ok: true, quantity: 0, avgPrice: 0 });
+  });
+
+  it('refuses to undo a buy whose shares were already sold', () => {
+    const afterSell = applySell(baseHolding, { quantity: 8 });
+    expect(reverseTrade(afterSell, { type: 'buy', quantity: 10, price: 70_000 })).toEqual({
+      ok: false,
+      reason: 'insufficient-quantity',
+    });
+    expect(reverseTrade(null, { type: 'buy', quantity: 1, price: 70_000 })).toEqual({
+      ok: false,
+      reason: 'insufficient-quantity',
+    });
+  });
+
+  it('undoes a sell by restoring the shares at the cost basis at sale', () => {
+    const afterSell = applySell(baseHolding, { quantity: 4 });
+    expect(reverseTrade(afterSell, { type: 'sell', quantity: 4, price: 90_000, avgCostAtSale: 70_000 })).toEqual({
+      ok: true,
+      quantity: 10,
+      avgPrice: 70_000,
+    });
+  });
+
+  it('undoes a full-position sell by recreating the position', () => {
+    expect(reverseTrade(null, { type: 'sell', quantity: 10, price: 90_000, avgCostAtSale: 70_000 })).toEqual({
+      ok: true,
+      quantity: 10,
+      avgPrice: 70_000,
+    });
+  });
+
+  it('falls back to the sell price when an old sell lacks avgCostAtSale', () => {
+    expect(reverseTrade(null, { type: 'sell', quantity: 2, price: 90_000 })).toEqual({
+      ok: true,
+      quantity: 2,
+      avgPrice: 90_000,
+    });
   });
 });

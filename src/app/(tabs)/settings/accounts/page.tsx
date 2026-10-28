@@ -5,9 +5,13 @@ import Link from 'next/link';
 import { createId } from '@paralleldrive/cuid2';
 import { ChevronLeft, CreditCard, Bitcoin, Landmark, Plus } from 'lucide-react';
 import type { Account, FamilyMember } from '@/lib/schema';
-import { accountsRepo, familyRepo } from '@/lib/repos';
+import { accountsRepo, familyRepo, holdingsRepo } from '@/lib/repos';
+import { deleteAccount } from '@/lib/ledgerOps';
+import { valueByAccount } from '@/lib/holdingsValue';
+import { getMarketAsset } from '@/lib/market';
+import { getFxRate } from '@/lib/fx';
 import { formatKRW } from '@/lib/loans';
-import { useCurrentUserId } from '@/components/AuthProvider';
+import { useCurrentUserId, useMarketDataKey } from '@/components/AuthProvider';
 import { AddAccountModal, type AddAccountInput } from '@/features/accounts/AddAccountModal';
 import { EmptyState } from '@/components/EmptyState';
 import { institutionKind } from '@/lib/institutions';
@@ -24,12 +28,17 @@ export default function AccountsPage() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [members, setMembers] = useState<FamilyMember[]>([]);
   const [addOpen, setAddOpen] = useState(false);
+  const [editing, setEditing] = useState<Account | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [values, setValues] = useState<Map<string, number>>(new Map());
+  const marketKey = useMarketDataKey();
 
   useEffect(() => {
     if (!userId) return;
     setAccounts(accountsRepo.list(userId));
     setMembers(familyRepo.list(userId));
-  }, [userId]);
+    setValues(valueByAccount(holdingsRepo.list(userId), getMarketAsset, getFxRate('USDKRW')));
+  }, [userId, marketKey]);
 
   const membersById = useMemo(
     () => Object.fromEntries(members.map((m) => [m.id, m] as const)),
@@ -63,6 +72,23 @@ export default function AccountsPage() {
     };
     accountsRepo.add(userId, account);
     setAccounts(accountsRepo.list(userId));
+  }
+
+  function handleEdit(input: AddAccountInput) {
+    if (!userId || !editing) return;
+    accountsRepo.update(userId, editing.id, input);
+    setAccounts(accountsRepo.list(userId));
+  }
+
+  function handleDelete() {
+    if (!userId || !editing) return;
+    const result = deleteAccount(userId, editing.id);
+    if (!result.ok) {
+      setDeleteError('보유 종목이 남아 있어 삭제할 수 없어요. 먼저 매도하거나 거래를 삭제해 주세요.');
+      return;
+    }
+    setAccounts(accountsRepo.list(userId));
+    setEditing(null);
   }
 
   return (
@@ -108,9 +134,14 @@ export default function AccountsPage() {
                 </p>
                 <div className="space-y-2">
                   {list.map((acc) => (
-                    <div
+                    <button
+                      type="button"
                       key={acc.id}
-                      className="bg-white rounded-[24px] border border-gray-100 p-5 flex items-center gap-3 shadow-sm"
+                      onClick={() => {
+                        setDeleteError(null);
+                        setEditing(acc);
+                      }}
+                      className="w-full text-left bg-white rounded-[24px] border border-gray-100 p-5 flex items-center gap-3 shadow-sm"
                     >
                       <div className="w-10 h-10 bg-brand-surface rounded-2xl flex items-center justify-center text-brand shrink-0">
                         {iconFor(acc.institution)}
@@ -119,9 +150,9 @@ export default function AccountsPage() {
                         <p className="text-sm font-black text-brand-ink truncate">{acc.name}</p>
                       </div>
                       <p className="text-sm font-black text-brand-ink tabular-nums shrink-0">
-                        {formatKRW(0)}
+                        {formatKRW(Math.round(values.get(acc.id) ?? 0))}
                       </p>
-                    </div>
+                    </button>
                   ))}
                 </div>
               </div>
@@ -143,6 +174,16 @@ export default function AccountsPage() {
         onClose={() => setAddOpen(false)}
         members={members}
         onSubmit={handleAdd}
+      />
+
+      <AddAccountModal
+        open={editing !== null}
+        onClose={() => setEditing(null)}
+        members={members}
+        initial={editing}
+        onSubmit={handleEdit}
+        onDelete={handleDelete}
+        deleteError={deleteError}
       />
     </div>
   );

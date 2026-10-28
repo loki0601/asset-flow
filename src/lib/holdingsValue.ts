@@ -42,3 +42,15 @@ export function liveHoldingsValue(
   }
   return { assets, cost, profit: assets - cost };
 }
+
+export function valueByAccount(
+  holdings: Array<ValuedHolding & { accountId: string }>,
+  getAsset: (symbol: string) => { currency: 'KRW' | 'USD'; currentPrice: number } | undefined,
+  fxUsdKrw: number,
+): Map<string, number> {
+  const byAccount = new Map<string, ValuedHolding[]>();
+  for (const h of holdings) byAccount.set(h.accountId, [...(byAccount.get(h.accountId) ?? []), h]);
+  return new Map(
+    Array.from(byAccount, ([accountId, list]) => [accountId, liveHoldingsValue(list, getAsset, fxUsdKrw).assets]),
+  );
+}

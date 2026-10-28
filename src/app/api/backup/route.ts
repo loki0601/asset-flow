@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getServerDb } from '@/server/db';
 import { getRequestUser } from '@/server/requestAuth';
+import { isSqliteBlob } from '@/server/sqliteBlob';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -33,6 +34,9 @@ export async function POST(request: Request) {
       { error: `blob too large (${buf.length} > ${MAX_BLOB_BYTES})` },
       { status: 413 },
     );
+  }
+  if (!isSqliteBlob(buf)) {
+    return NextResponse.json({ error: 'not a SQLite database' }, { status: 400 });
   }
 
   const db = getServerDb();

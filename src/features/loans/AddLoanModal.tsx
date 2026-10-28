@@ -96,7 +96,7 @@ export function AddLoanModal({ open, onClose, members, onSubmit }: Props) {
   const [method, setMethod] = useState<LoanMethod>('원리금균등상환');
   const [startDate, setStartDate] = useState('');
   const [termYearsStr, setTermYearsStr] = useState('');
-  const [paymentDayStr, setPaymentDayStr] = useState('');
+  const [paymentDayStr, setPaymentDayStr] = useState('15');
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -111,7 +111,7 @@ export function AddLoanModal({ open, onClose, members, onSubmit }: Props) {
       setMethod('원리금균등상환');
       setStartDate('');
       setTermYearsStr('');
-      setPaymentDayStr('');
+      setPaymentDayStr('15');
       setError(null);
     }
   }, [open, members]);

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { userSnapshotRepo } from '@/server/db';
 import { getRequestUser } from '@/server/requestAuth';
+import { isSqliteBlob } from '@/server/sqliteBlob';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -30,6 +31,7 @@ export async function PUT(request: Request) {
   if (blob.length > MAX_SNAPSHOT_BYTES) {
     return NextResponse.json({ error: '동기화 데이터가 50MB 제한을 초과했습니다.' }, { status: 413 });
   }
+  if (!isSqliteBlob(blob)) return NextResponse.json({ error: '올바르지 않은 동기화 데이터입니다.' }, { status: 400 });
   const snapshot = userSnapshotRepo.put(user.id, blob);
   return NextResponse.json(
     { revision: snapshot.revision, updatedAt: snapshot.updatedAt },

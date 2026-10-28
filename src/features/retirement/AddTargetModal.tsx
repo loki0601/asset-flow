@@ -5,6 +5,7 @@ import { Target, ChevronDown } from 'lucide-react';
 import type { FamilyMember, RetirementTarget } from '@/lib/schema';
 import { Modal } from '@/components/Modal';
 import { ModalHeader } from '@/components/ModalHeader';
+import { validateRetirementAges } from '@/lib/retirement';
 
 export interface AddTargetInput {
   memberId: string;
@@ -121,6 +122,16 @@ export function AddTargetModal({ open, onClose, members, existing, onSubmit }: P
     if (publicOn && (!Number.isFinite(pm) || pm <= 0)) {
       return setError('국민연금 월 예상 수령액을 입력하세요.');
     }
+    const ageError = validateRetirementAges({
+      currentAge: ca,
+      targetAge: ta,
+      pensions: [
+        { label: '국민연금', enabled: publicOn, startAge: Number(publicStartAge) || DEFAULTS.publicStartAge },
+        { label: '퇴직연금', enabled: corporateOn, startAge: Number(corporateStartAge) || DEFAULTS.corporateStartAge },
+        { label: '개인연금', enabled: personalOn, startAge: Number(personalStartAge) || DEFAULTS.personalStartAge },
+      ],
+    });
+    if (ageError) return setError(ageError);
 
     onSubmit({
       memberId,

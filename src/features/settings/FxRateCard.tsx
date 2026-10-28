@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { ArrowUpRight, ArrowDownRight, ArrowLeftRight } from 'lucide-react';
 import { fxHistoryRepo } from '@/lib/fxHistoryRepo';
 import { getFxRate, syncFxHistory } from '@/lib/fx';
-import { usePriceSync } from '@/components/AuthProvider';
+import { useAuthReady, usePriceSync } from '@/components/AuthProvider';
 
 interface FxState {
   rate: number;
@@ -15,6 +15,7 @@ interface FxState {
 
 export function FxRateCard() {
   const { pricesLastSyncAt } = usePriceSync();
+  const ready = useAuthReady();
   const [state, setState] = useState<FxState>({
     rate: 0,
     change: null,
@@ -23,6 +24,7 @@ export function FxRateCard() {
   });
 
   useEffect(() => {
+    if (!ready) return;
     let cancelled = false;
     function readLocal() {
       const rows = fxHistoryRepo.listAll('USDKRW');
@@ -49,7 +51,7 @@ export function FxRateCard() {
     return () => {
       cancelled = true;
     };
-  }, [pricesLastSyncAt]);
+  }, [pricesLastSyncAt, ready]);
 
   const isUp = (state.change ?? 0) >= 0;
 

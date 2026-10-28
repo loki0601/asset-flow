@@ -130,10 +130,6 @@ export default function LoginPage() {
             >
               회원가입
             </Link>
-            <span className="text-brand-line">|</span>
-            <span className="opacity-50 select-none">아이디 찾기</span>
-            <span className="text-brand-line">|</span>
-            <span className="opacity-50 select-none">비밀번호 재설정</span>
           </div>
         </form>
 

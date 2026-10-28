@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { liveHoldingsValue } from '@/lib/holdingsValue';
+import { liveHoldingsValue, valueByAccount } from '@/lib/holdingsValue';
 
 const asset = (currency: 'KRW' | 'USD', currentPrice: number) => ({ currency, currentPrice });
 
@@ -59,5 +59,26 @@ describe('liveHoldingsValue', () => {
       1300,
     );
     expect(r.profit).toBeCloseTo(r.assets - r.cost, 6);
+  });
+});
+
+describe('valueByAccount', () => {
+  it('sums live KRW value per account', () => {
+    const getAsset = (symbol: string) =>
+      symbol === 'NASDAQ:AAPL'
+        ? { currency: 'USD' as const, currentPrice: 300 }
+        : { currency: 'KRW' as const, currentPrice: 70_000 };
+    const values = valueByAccount(
+      [
+        { accountId: 'a1', symbol: 'NASDAQ:AAPL', quantity: 10, avgPrice: 250 },
+        { accountId: 'a1', symbol: 'KRX:005930', quantity: 2, avgPrice: 60_000 },
+        { accountId: 'a2', symbol: 'KRX:005930', quantity: 1, avgPrice: 60_000 },
+      ],
+      getAsset,
+      1_300,
+    );
+    expect(values.get('a1')).toBe(10 * 300 * 1_300 + 2 * 70_000);
+    expect(values.get('a2')).toBe(70_000);
+    expect(values.get('missing')).toBeUndefined();
   });
 });

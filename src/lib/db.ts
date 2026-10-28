@@ -146,6 +146,23 @@ let persister: DbPersister = defaultPersister();
 let db: Database | null = null;
 let SQL: SqlJsStatic | null = null;
 
+/** sql.js accepts any bytes at construction and only fails on first query. */
+function openValidDatabase(sql: SqlJsStatic, blob: Uint8Array): Database | null {
+  let candidate: Database | null = null;
+  try {
+    candidate = new sql.Database(blob);
+    candidate.exec('SELECT count(*) FROM sqlite_master');
+    return candidate;
+  } catch {
+    try {
+      candidate?.close();
+    } catch {
+      /* ignore */
+    }
+    return null;
+  }
+}
+
 export function setPersister(p: DbPersister): void {
   persister = p;
 }
@@ -168,7 +185,13 @@ export async function initDb(options?: {
     });
   }
   const blob = await persister.load();
-  db = blob ? new SQL.Database(blob) : new SQL.Database();
+  db = blob ? openValidDatabase(SQL, blob) : null;
+  if (!db) {
+    // A corrupt persisted blob would otherwise fail every boot until the
+    // user wipes app data; the server snapshot restores data on next login.
+    if (blob) console.warn('[db] persisted DB is corrupt — starting fresh');
+    db = new SQL.Database();
+  }
   db.exec(`CREATE TABLE IF NOT EXISTS kv (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL
@@ -215,8 +238,10 @@ export function exportDbForSync(): Uint8Array {
 export async function importDbFromSync(snapshot: Uint8Array): Promise<void> {
   if (!SQL) await initDb();
   if (!SQL) throw new Error('SQLite runtime could not be initialized');
+  const next = openValidDatabase(SQL, snapshot);
+  if (!next) throw new Error('서버 동기화 데이터가 손상되어 불러오지 못했습니다.');
   const previous = db;
-  db = new SQL.Database(snapshot);
+  db = next;
   if (previous) {
     try {
       previous.close();

@@ -194,6 +194,8 @@ export interface RetirementProfile {
   currentAge: number;
   targetMonthly: number;
   expectedMonthly: number;
+  /** Age the inflation-adjusted target refers to (single member only). */
+  targetBasisAge?: number;
 }
 
 // ─── Asset (server-provided market data) ──────────────────────────────
