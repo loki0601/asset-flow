@@ -1,3 +1,13 @@
+<!-- HELIOS_SSOT_BEGIN -->
+## 프로젝트 SSOT
+
+@.ssot/AGENT_CONTEXT.md
+작업 전 [.ssot/AGENT_CONTEXT.md](.ssot/AGENT_CONTEXT.md)와 [.ssot/README.md](.ssot/README.md)를 읽는다.
+기획·설계·운영 문서는 연결된 SSOT에서 갱신하고 근거 코드·검증·이력을 남긴다.
+레포에 남은 문서의 소유권은 SSOT 문서 지도에서 확인한다. 코드/콘텐츠 입력·기존 개별 규칙은 보존한다.
+심링크가 없으면 workspace/ssot/scripts/link_repositories.py로 연결을 복구한다.
+<!-- HELIOS_SSOT_END -->
+
 # asset-flow — 작업 지침
 
 ## 1. TDD가 기본 원칙 (예외 없음)
@@ -52,7 +62,7 @@ production 서버는 **launchd 잡 `com.assetflow.web`이 관리**한다 (KeepAl
 2. `pnpm build` (production 빌드) — **서버를 중단하지 않고 그대로 빌드한다.** build-and-preserve가 이전 청크를 보존하므로 돌아가는 구 서버는 빌드 중에도 일관되게 서빙된다.
 3. `launchctl kickstart -k gui/501/com.assetflow.web` — 빌드 **완료 후** 재시작
 4. 검증: `curl -s https://assetflow.elkavio.com/login`에서 참조하는 `/_next/static/chunks/*.js` 경로를 추출해 각각 200인지 확인 (공개 파일·API 200만으로는 부족 — 구 서버도 public/과 prices.json은 최신으로 서빙하므로 착각하기 쉽다)
-5. 텔레그램으로 사용자에게 반영 완료 보고
+5. 대화 응답으로 사용자에게 반영 완료 보고 (텔레그램 보고는 사용하지 않는다)
 
 **서버를 먼저 죽이면 안 되는 이유(실제 장애)**: 빌드 전에 kill → launchd가 빌드 도중 재기동 → 반쯤 쓰인 `.next`를 로드 → 기기에서 부팅이 깨져 "로그인 안 되고 데이터가 안 보이는" 상태가 됐다 (2026-07-05).
 
