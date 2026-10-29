@@ -29,23 +29,21 @@ beforeEach(() => {
 });
 
 describe('resolveBootSession — a network hiccup during boot must never look like a logout', () => {
-  it('stays signed in when connectServerSession fails (e.g. offline / tunnel hiccup on app cold-start)', async () => {
-    // adoptServerSession (called by the real connectServerSession before it
-    // ever touches the network) already wrote this session to disk in an
-    // earlier successful login — that's the ground truth for "am I logged
-    // in", independent of whether today's boot sync round-trip succeeds.
+  it('never round-trips the full snapshot on boot — it is a login-time bootstrap only', async () => {
+    // The snapshot is the whole local DB (~11MB with price history). Boot
+    // used to GET it and then PUT it back on every cold start, which made
+    // the app sit on the splash for seconds over the tunnel. The change
+    // feed already keeps signed-in devices in sync.
     adoptServerSession(session);
-    connectServerSession.mockRejectedValue(new Error('network error'));
 
     const userId = await resolveBootSession();
 
     expect(userId).toBe('u1');
-    expect(getCurrentUserId()).toBe('u1');
+    expect(connectServerSession).not.toHaveBeenCalled();
   });
 
   it('stays signed in when the post-connect change-feed sync fails', async () => {
     adoptServerSession(session);
-    connectServerSession.mockResolvedValue('downloaded');
     flushChangeOutbox.mockRejectedValue(new Error('ECONNRESET'));
 
     const userId = await resolveBootSession();
@@ -55,7 +53,6 @@ describe('resolveBootSession — a network hiccup during boot must never look li
 
   it('resolves to the connected user id on a clean boot', async () => {
     adoptServerSession(session);
-    connectServerSession.mockResolvedValue('downloaded');
 
     const userId = await resolveBootSession();
 
